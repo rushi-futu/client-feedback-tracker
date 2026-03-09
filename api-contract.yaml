@@ -1,0 +1,139 @@
+# ── API Contract ─────────────────────────────────────────────────────────────
+# Project: Client Feedback Tracker
+# Generated: 2026-03-09
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Feature: Client Feedback Logging ─────────────────────────────────────────
+# Added: 2026-03-09
+# Status: PENDING_APPROVAL
+# UI source: feature intent (design/ui-spec.md not yet produced)
+# Spec basis: CLAUDE.md project description + user story
+#   "As a client success manager I want to log feedback from clients,
+#    tag it by theme (UX, Performance, Support), and mark items as actioned
+#    so the team can track what has been addressed."
+# ─────────────────────────────────────────────────────────────────────────────
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds the FeedbackBoard/FeedbackList component — returns all feedback items
+      with optional filters by client_name, theme, and actioned status.
+    query_params:
+      client_name:
+        type: string
+        required: false
+        description: "Filter to a single client (exact match)"
+      theme:
+        type: string
+        required: false
+        description: "Filter by theme enum value: ux | performance | support"
+      actioned:
+        type: boolean
+        required: false
+        description: "Filter by actioned status: true | false"
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles CreateFeedbackForm submission — logs a new feedback item
+      for a named client with a theme tag.
+    request:
+      body:
+        client_name: string       # name of the client the feedback came from
+        content: string           # free-text feedback content
+        theme: "ux|performance|support"
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{feedback_id}
+    purpose: >
+      Feeds the FeedbackDetail view — returns a single feedback item by ID.
+    path_params:
+      feedback_id: integer
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{feedback_id}
+    purpose: >
+      Handles inline edits on a FeedbackCard — supports marking an item
+      as actioned, changing the theme, updating client name or content.
+      All fields optional (partial update).
+    path_params:
+      feedback_id: integer
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{feedback_id}
+    purpose: >
+      Handles delete action on a FeedbackCard — removes the feedback item.
+    path_params:
+      feedback_id: integer
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+schemas:
+
+  FeedbackRead:
+    description: >
+      Full representation of a feedback item returned by all read and write endpoints.
+    fields:
+      id: integer
+      client_name: string
+      content: string
+      theme: "ux|performance|support"
+      actioned: boolean
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, content, theme, actioned, created_at, updated_at]
+
+  FeedbackCreate:
+    description: >
+      Payload for POST /feedback/ — all fields required on creation.
+    fields:
+      client_name: string
+      content: string
+      theme: "ux|performance|support"
+    required: [client_name, content, theme]
+
+  FeedbackUpdate:
+    description: >
+      Payload for PATCH /feedback/{id} — all fields optional, at least one must be provided.
+      Used for marking actioned, re-tagging theme, or correcting client_name / content.
+    fields:
+      client_name: "string | null"
+      content: "string | null"
+      theme: "ux|performance|support | null"
+      actioned: "boolean | null"
+    required: []
+
+enums:
+
+  FeedbackTheme:
+    values: [ux, performance, support]
+    description: >
+      Controlled vocabulary for tagging feedback by domain.
+      Extensible — add values here and in the DB enum before using them.
