@@ -1,3 +1,10 @@
+# Project: Client Feedback Tracker
+A tool for client success managers to log feedback from clients,
+tag it by theme (e.g. UX, Performance, Support), and track whether
+each item has been actioned. Feedback can be filtered by client,
+theme, and status.
+
+
 # Vibe Engineering Harness
 # Agents execute. Humans referee.
 
