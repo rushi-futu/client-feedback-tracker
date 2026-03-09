@@ -1,5 +1,5 @@
 # Codebase Architecture
-# Story Assignment Board — FastAPI + Next.js 15 monorepo
+# Client Feedback Tracker — FastAPI + Next.js 15 monorepo
 
 ## Directory Structure
 
