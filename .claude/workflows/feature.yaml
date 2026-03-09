@@ -1,0 +1,129 @@
+# Workflow Definition: Feature Delivery
+# Full cycle — PM prototype to merge-ready PR
+# Run via: gh workflow run ai-feature.yml -f intent="..." -f prototype_url="..."
+
+workflow: feature
+description: Full feature delivery — prototype to merge-ready PR with 5 human gates
+
+inputs:
+  intent:
+    description: "What to build, in plain English"
+    required: true
+  prototype_url:
+    description: "v0 or prototype URL — leave blank to skip visual step"
+    required: false
+  branch:
+    description: "Branch to create"
+    default: "ai/feature-{{timestamp}}"
+
+steps:
+  - id: visual
+    name: "Visual agent: read prototype → ui-spec"
+    agent: visual
+    condition: "{{inputs.prototype_url}} is set"
+    prompt: |
+      Read the PM prototype at {{inputs.prototype_url}}.
+      Produce design/ui-spec.md following your output format.
+      Do not read or copy generated code — extract design intent only.
+    outputs:
+      - design/ui-spec.md
+    gate:
+      type: human_approval
+      environment: pm-gate
+      who: PM
+      message: |
+        The visual agent has read your prototype and produced a UI spec.
+        Review design/ui-spec.md — did it correctly understand your design?
+        Answer any ambiguities flagged in the spec before approving.
+
+  - id: plan
+    name: "Architect: API contract"
+    agent: architect
+    depends_on: visual
+    prompt: |
+      Phase 1: Read design/ui-spec.md (if present), skill files, and existing contract.
+      Feature intent: {{inputs.intent}}
+      Produce api-contract.yaml and tasks/current-feature.md.
+      Every endpoint must serve a component or interaction from the ui-spec.
+    outputs:
+      - api-contract.yaml
+      - tasks/current-feature.md
+    gate:
+      type: human_approval
+      environment: plan-gate
+      who: PM + Eng
+      message: |
+        Review api-contract.yaml — is this the right API surface?
+        Every endpoint is grounded in the PM-approved ui-spec.
+
+  - id: plan-impl
+    name: "Architect: implementation plan"
+    agent: architect
+    depends_on: plan
+    prompt: |
+      Phase 2: Contract is approved. Produce tasks/implementation-plan.md.
+      Include data model, shared types, file lists, service logic spec,
+      component tree (mapped to ui-spec), decisions, testability notes, open questions.
+    outputs:
+      - tasks/implementation-plan.md
+    gate:
+      type: human_approval
+      environment: impl-gate
+      who: Eng
+      message: |
+        Review tasks/implementation-plan.md — is this how you want it built?
+        Override any open question defaults by editing the file before approving.
+        This is the last checkpoint before code is written.
+
+  - id: build
+    name: "Feature team: build"
+    agent: feature-build-team
+    depends_on: plan-impl
+    parallel: true
+    prompt: |
+      Implementation plan is approved. Build the full feature.
+      Backend: follow api-patterns.md and data-patterns.md.
+      Frontend: follow frontend-patterns.md, use ui-spec as layout reference only.
+      Both: read implementation-plan.md as primary source of truth.
+    outputs:
+      - backend/**
+      - frontend/**
+    gate:
+      type: none
+
+  - id: test
+    name: "Tester: adversarial suite"
+    agent: tester
+    depends_on: build
+    prompt: |
+      Write and run adversarial tests. Read implementation-plan.md for intent and edge cases.
+      Document findings. Do not fix — only find and document.
+    outputs:
+      - backend/tests/**
+      - frontend/src/**/__tests__/**
+      - escalation/log/test-findings-*.yaml
+    gate:
+      type: human_triage
+      environment: test-gate
+      who: Eng
+      message: |
+        Adversarial tests complete. Review findings in escalation/log/.
+        Approve to continue — you'll make merge decisions at the final gate.
+
+  - id: review
+    name: "Reviewer: DoD + contract + plan + UI compliance"
+    agent: reviewer
+    depends_on: test
+    prompt: |
+      Review against: approved contract, approved implementation plan,
+      definition of done, code patterns, and ui-spec (does frontend match PM design?).
+      Flag deviations from the plan — were they escalated or undocumented?
+    outputs:
+      - escalation/log/review-*.yaml
+    gate:
+      type: human_merge
+      environment: merge-gate
+      who: Eng
+      message: |
+        Review complete. Check escalation/log/ for the full report.
+        Approve to open PR. Reject to request changes.

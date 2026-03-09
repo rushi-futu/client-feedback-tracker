@@ -1,0 +1,34 @@
+# module-boundaries.json
+# Defines the allowed dependency direction across your codebase layers.
+# Violations are caught by the PostToolUse structural hook.
+#
+# Dependency direction enforced:
+#   Types → Config → Repository → Service → Controller → UI
+#
+# Lower layers CANNOT import from higher layers.
+# Customise for your actual project structure.
+{
+  "layers": [
+    { "name": "types",      "glob": "src/types/**" },
+    { "name": "config",     "glob": "src/config/**" },
+    { "name": "repository", "glob": "src/repository/**" },
+    { "name": "service",    "glob": "src/service/**" },
+    { "name": "controller", "glob": "src/controller/**" },
+    { "name": "ui",         "glob": "src/ui/**" }
+  ],
+
+  "allowed_direction": "types → config → repository → service → controller → ui",
+
+  "forbidden_imports": [
+    { "from": "src/repository", "to": "src/service",    "reason": "Repository cannot depend on service layer" },
+    { "from": "src/repository", "to": "src/controller", "reason": "Repository cannot depend on controller layer" },
+    { "from": "src/repository", "to": "src/ui",         "reason": "Repository cannot depend on UI layer" },
+    { "from": "src/service",    "to": "src/controller", "reason": "Service cannot depend on controller layer" },
+    { "from": "src/service",    "to": "src/ui",         "reason": "Service cannot depend on UI layer" },
+    { "from": "src/controller", "to": "src/ui",         "reason": "Controller cannot depend on UI layer" },
+    { "from": "src/types",      "to": "src/service",    "reason": "Types cannot import from service (circular risk)" },
+    { "from": "src/types",      "to": "src/repository", "reason": "Types cannot import from repository (circular risk)" }
+  ],
+
+  "notes": "Add project-specific boundaries here. Keep this file updated as your architecture evolves. The GC agent checks this file for drift during maintenance runs."
+}

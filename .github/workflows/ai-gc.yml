@@ -1,0 +1,130 @@
+# Harness Garbage Collection
+#
+# Runs on a schedule. Keeps the knowledge base honest.
+# Detects: stale skills, orphaned tasks, contract drift, unresolved escalations.
+# Opens an issue if anything needs human attention.
+# Never modifies code — read and report only.
+
+name: Harness GC
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"   # Every Monday 9am UTC
+  workflow_dispatch:        # Also triggerable manually
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  gc:
+    name: "Harness health scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run GC scan
+        run: |
+          TS=$(date +%Y%m%d-%H%M%S)
+          REPORT="escalation/log/gc-report-${TS}.yaml"
+
+          claude \
+            --dangerously-skip-permissions \
+            -p "$(cat << PROMPT
+          You are the harness maintenance agent. Scan the repository and produce
+          a health report at $REPORT.
+
+          Check each of the following:
+
+          1. CONTRACT DRIFT
+             Read api-contract.yaml.
+             Scan backend/ and frontend/ for routes and components.
+             Flag any endpoint in the contract with no implementation, or
+             any implemented endpoint not in the contract.
+
+          2. STALE KNOWLEDGE
+             Read all files under .claude/skills/.
+             Check each pattern against the actual codebase.
+             Flag patterns that reference files, imports, or conventions
+             that no longer exist.
+
+          3. ORPHANED TASKS
+             Read tasks/current-feature.md if it exists.
+             Flag any tasks marked in-progress with no recent git activity.
+
+          4. UNRESOLVED ESCALATIONS
+             Read all files in escalation/log/.
+             Flag any escalation with no resolution block that is older than 7 days.
+
+          5. PROMOTION GAPS
+             Scan git log for patterns in recent commits that look reusable
+             but have not been promoted to .claude/skills/.
+
+          Write the report in this format:
+          ---
+          gc_run: $TS
+          status: clean | warnings | action_required
+          findings:
+            contract_drift: []
+            stale_knowledge: []
+            orphaned_tasks: []
+            unresolved_escalations: []
+            promotion_gaps: []
+          summary: one sentence
+          recommended_actions: []
+
+          Be specific. Reference file paths and line numbers where relevant.
+          If everything is healthy, status: clean and empty findings arrays.
+          PROMPT
+          )"
+
+      - name: Commit GC report
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add escalation/log/
+          git diff --staged --quiet || \
+            git commit -m "chore: weekly GC scan [skip ci]" && \
+            git push origin main
+
+      - name: Open issue if action required
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPORT=$(ls -t escalation/log/gc-report-*.yaml 2>/dev/null | head -1 || echo "")
+
+          if [ -z "$REPORT" ]; then
+            echo "No GC report generated"
+            exit 0
+          fi
+
+          STATUS=$(grep "^status:" "$REPORT" | awk '{print $2}' || echo "unknown")
+          SUMMARY=$(grep "^summary:" "$REPORT" | cut -d: -f2- | xargs || echo "See report")
+
+          if [ "$STATUS" = "action_required" ]; then
+            gh issue create \
+              --title "🔧 Harness GC: action required — $(date +%Y-%m-%d)" \
+              --body "## Weekly Harness GC Report
+
+          **Status**: \`$STATUS\`
+          **Summary**: $SUMMARY
+
+          Full report: \`$REPORT\`
+
+          Check the report and take action before the next feature delivery.
+          The harness knowledge may be drifting from the actual codebase." \
+              --label "harness,maintenance"
+          elif [ "$STATUS" = "warnings" ]; then
+            echo "GC warnings found — not blocking, no issue opened"
+            echo "Summary: $SUMMARY"
+          else
+            echo "✅ Harness healthy — no action required"
+          fi

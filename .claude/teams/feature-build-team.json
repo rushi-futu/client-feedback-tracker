@@ -1,0 +1,32 @@
+{
+  "name": "feature-build-team",
+  "description": "Parallel frontend and backend implementation team. Runs against an approved API contract. FE and BE work simultaneously and can message each other directly.",
+  "lead_instructions": "You are the team lead. Your job is to coordinate the frontend and backend teammates. Assign tasks from tasks/[feature].md, monitor for escalations, and synthesise results. You do NOT write code yourself.",
+  "teammates": [
+    {
+      "name": "frontend",
+      "agent": "frontend",
+      "description": "Frontend implementation. Reads contract, builds UI, can message backend directly."
+    },
+    {
+      "name": "backend",
+      "agent": "backend",
+      "description": "Backend implementation. Reads contract, builds API/data, can message frontend directly."
+    }
+  ],
+  "coordination": {
+    "shared_context": [
+      "api-contract.yaml",
+      "config/harness.config.yaml",
+      "tasks/"
+    ],
+    "communication": "direct",
+    "escalation_dir": "escalation/log/"
+  },
+  "notes": [
+    "Enable with: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1",
+    "Both teammates read the same api-contract.yaml — this is the handshake",
+    "Teammates should message each other before escalating to human where possible",
+    "If both teammates agree an escalation is needed, it carries more weight"
+  ]
+}

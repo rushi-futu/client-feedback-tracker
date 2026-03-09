@@ -1,0 +1,176 @@
+# harness.config.yaml
+# Single file to customise the harness for your project.
+# All agents read this at the start of every session.
+
+# ── PROJECT ──────────────────────────────────────────────────────
+project:
+  name: "[PROJECT_NAME]"
+  description: "[What this project does in one sentence]"
+  repo: "[github.com/org/repo]"
+
+# ── STACK ────────────────────────────────────────────────────────
+stack:
+  language: "[TypeScript | Python | Go | Java]"
+  runtime: "[Node.js 20 | Python 3.12 | etc]"
+  framework: "[Next.js 14 | FastAPI | etc]"
+  database: "[PostgreSQL | MongoDB | etc]"
+  orm: "[Prisma | Drizzle | SQLAlchemy | etc]"
+  test_framework: "[Vitest | Jest | Pytest | etc]"
+  api_style: "[REST | GraphQL | tRPC | gRPC]"
+  ci_cd: "[GitHub Actions | CircleCI | etc]"
+
+# ── KNOWLEDGE LAYER ──────────────────────────────────────────────
+knowledge:
+  # Which K slices are active for this project
+  k1_codebase: true
+  k2_system_context: true        # set false for standalone apps
+  k3_domain: true
+  k4_org_context: true
+  k5_standards: true
+
+  # Domain pack to load for domain-specific tasks
+  domain_pack: ".claude/skills/domain/[client-name].md"
+
+  # K2: How system context is served
+  # "static" = read from .claude/skills/codebase/K2-system-context.md
+  # "mcp"    = query live from mcp/ server (requires mcp server running)
+  k2_mode: "static"
+  k2_mcp_url: "http://localhost:3100"
+
+# ── TOOLS ────────────────────────────────────────────────────────
+# MCP servers and external tools available to agents.
+# Each tool has: which agents can use it, and whether it's required before
+# certain phases. Required tools block progression until called.
+#
+# To register an MCP server, also add it to .claude/settings.json.
+# See: .claude/tools-registry.md for full documentation.
+
+tools:
+  # Format:
+  # - name: human-readable name (matches mcp server name in settings.json)
+  #   type: mcp | cli | api
+  #   purpose: one line — what this tool gives agents
+  #   available_to: [architect, frontend, backend, tester, reviewer, router, all]
+  #   required_before: [plan, build, test, review]  ← agents must call this first
+  #   optional: true | false
+
+  # ── EXAMPLES — uncomment and configure what you're using ──
+
+  # Figma (design context for frontend agent)
+  # - name: figma
+  #   type: mcp
+  #   purpose: "Fetch component specs, tokens, and design decisions before building UI"
+  #   available_to: [frontend, architect]
+  #   required_before: [build]   ← frontend must query Figma before writing any UI
+  #   optional: false
+
+  # GitHub (codebase and PR context)
+  # - name: github
+  #   type: mcp
+  #   purpose: "Read existing code, PRs, issues before planning"
+  #   available_to: [architect, reviewer]
+  #   required_before: [plan]    ← architect must check existing patterns first
+  #   optional: false
+
+  # Linear / Jira (ticket context)
+  # - name: linear
+  #   type: mcp
+  #   purpose: "Read acceptance criteria and linked specs from tickets"
+  #   available_to: [architect, router]
+  #   required_before: [plan]
+  #   optional: false
+
+  # Sentry / Datadog (production context for tester)
+  # - name: sentry
+  #   type: mcp
+  #   purpose: "Check existing error patterns before writing tests"
+  #   available_to: [tester]
+  #   required_before: [test]
+  #   optional: true
+
+  # Confluence / Notion (org knowledge)
+  # - name: confluence
+  #   type: mcp
+  #   purpose: "Fetch runbooks, ADRs, team docs"
+  #   available_to: [architect, reviewer]
+  #   required_before: []        ← optional context, not required
+  #   optional: true
+
+  # K2 MCP server (built-in — system context live queries)
+  - name: k2-system-context
+    type: mcp
+    purpose: "Live system topology, service contracts, safety rules"
+    available_to: [architect, backend, reviewer]
+    required_before: [plan]
+    optional: false              # ignored if k2_mode is "static"
+
+# ── AGENTS ───────────────────────────────────────────────────────
+agents:
+  # Models — override per role if needed
+  architect_model: "claude-opus-4-5"
+  build_model: "claude-sonnet-4-6"
+  tester_model: "claude-sonnet-4-6"
+  reviewer_model: "claude-opus-4-5"
+  router_model: "claude-haiku-4-5-20251001"
+
+  # Agent Teams — enable parallel FE/BE execution
+  # Requires: CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+  use_agent_teams: true
+
+  # Tool permissions per role (principle of least privilege)
+  architect_tools: ["Read", "Write", "Bash", "Grep", "Glob"]
+  frontend_tools: ["Read", "Write", "Edit", "Bash", "Glob"]
+  backend_tools: ["Read", "Write", "Edit", "Bash", "Glob"]
+  tester_tools: ["Read", "Write", "Bash", "Glob", "Grep"]
+  reviewer_tools: ["Read", "Bash", "Grep", "Glob"]    # NO write
+  router_tools: ["Read"]                               # read only
+
+# ── ESCALATION ───────────────────────────────────────────────────
+escalation:
+  # Where escalations are written
+  log_dir: "escalation/log/"
+
+  # Routing — who gets which type of escalation
+  # Customise for your team structure
+  routing:
+    contract_conflict: "tech_lead"
+    ambiguity: "product_owner"
+    risk_high: "tech_lead"
+    risk_medium: "developer"
+    novel_pattern: "tech_lead"
+    test_finding: "developer"
+
+  # Blast radius thresholds — what makes something high/medium/low risk
+  risk:
+    high: ["shared schema change", "auth logic", "public API change", "payment", "data deletion"]
+    medium: ["new endpoint", "migration", "config change"]
+    low: ["ui component", "utility function", "docs"]
+
+# ── DELIVERY ─────────────────────────────────────────────────────
+delivery:
+  # Branch strategy
+  branch_pattern: "feat/[ticket-id]-[short-description]"
+
+  # PR requirements
+  require_reviewer_agent_report: true
+  require_passing_tests: true
+  require_type_check: true
+  require_lint: true
+
+  # Human checkpoints — which are mandatory vs advisory
+  checkpoints:
+    post_plan: mandatory          # always review the contract
+    post_build: advisory          # diff review, human decides
+    post_test: mandatory          # always triage test findings
+    post_review: mandatory        # always make merge decision
+
+# ── COMPOUND LOOP ────────────────────────────────────────────────
+compound_loop:
+  # Auto-detect patterns worth promoting (requires post-task hook)
+  auto_detect_patterns: true
+
+  # How many times a pattern must appear before promotion is suggested
+  promotion_threshold: 3
+
+  # Freshness — how often K2 should be refreshed (days)
+  k2_refresh_days: 7

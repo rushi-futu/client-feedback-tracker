@@ -1,0 +1,44 @@
+{
+  "name": "Vibe Engineering Harness",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+
+  // Mounts Claude config from host so credentials persist across rebuilds
+  "mounts": [
+    "source=${localEnv:HOME}/.claude,target=/home/node/.claude,type=bind,consistency=cached"
+  ],
+
+  "remoteUser": "node",
+
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh",
+  "waitFor": "postStartCommand",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "anthropic.claude-code",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "ms-vscode.vscode-typescript-next",
+        "eamodio.gitlens"
+      ],
+      "settings": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "typescript.tsdk": "/usr/local/lib/node_modules/typescript/lib"
+      }
+    }
+  },
+
+  // Run Claude with skip-permissions safely inside the container
+  // The Docker isolation is the guardrail — not the permission prompts
+  "remoteEnv": {
+    "CLAUDE_SKIP_PERMISSIONS": "true"
+  },
+
+  // What the container can reach on the network (rest is blocked by firewall)
+  "features": {}
+}

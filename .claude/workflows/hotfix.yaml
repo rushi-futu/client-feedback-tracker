@@ -1,0 +1,46 @@
+# Workflow Definition: Hotfix
+# For small, scoped fixes — skips architect and goes straight to build.
+# Run via: gh workflow run ai-hotfix.yml -f description="bug description"
+
+workflow: hotfix
+description: Fast path for small scoped fixes — no plan step, single gate at review
+
+inputs:
+  description:
+    description: "What's broken and what the fix should be"
+    required: true
+
+steps:
+  - id: fix
+    name: "Backend or frontend agent: implement fix"
+    agent: router                 # router decides which agent to use
+    prompt: |
+      A bug needs fixing. No planning required — just fix it.
+
+      Bug: {{inputs.description}}
+
+      Follow patterns in .claude/skills/codebase/.
+      Write a regression test that would have caught this.
+      Keep the change minimal and scoped.
+    outputs:
+      - backend/**
+      - frontend/**
+      - tests/**
+    gate:
+      type: none
+
+  - id: review
+    name: "Reviewer: verify fix is safe to merge"
+    agent: reviewer
+    depends_on: fix
+    prompt: |
+      A hotfix was just made for: {{inputs.description}}
+      Verify the fix is correct, scoped, and doesn't break anything else.
+      Check against patterns in .claude/skills/codebase/.
+      Output findings to escalation/log/hotfix-review-{{timestamp}}.yaml.
+    gate:
+      type: human_merge
+      environment: merge-gate
+      message: |
+        Hotfix review complete. Check escalation/log/ for the report.
+        Approve to open PR. Reject to request changes.

@@ -1,0 +1,621 @@
+# AI Feature Delivery Pipeline
+#
+# SETUP (one-time, per repo):
+#   1. GitHub repo → Settings → Environments
+#      Create FIVE environments:
+#        pm-gate      — PM approves "you understood my design"
+#        plan-gate    — PM + Eng approve the API contract
+#        impl-gate    — Eng approves the implementation plan
+#        test-gate    — Eng triages test findings
+#        merge-gate   — Eng approves merge
+#      On each: add the appropriate reviewers
+#   2. Settings → Actions → General → Workflow permissions → Read and write
+#   3. Settings → Secrets → ANTHROPIC_API_KEY
+#
+# USAGE:
+#   gh workflow run ai-feature.yml \
+#     -f intent="editor can create a story brief" \
+#     -f prototype_url="https://v0.dev/chat/your-project-url"
+#
+#   Or without a prototype (intent-only mode — visual step is skipped):
+#   gh workflow run ai-feature.yml -f intent="..."
+#
+# FLOW:
+#   bootstrap
+#   → [visual]         reads prototype → design/ui-spec.md
+#   → [pm-gate]        PM: "did you understand my design?"
+#   → plan             architect phase 1 → api-contract.yaml
+#   → [plan-gate]      PM + Eng: "is this the right API surface?"
+#   → plan-impl        architect phase 2 → implementation-plan.md
+#   → [impl-gate]      Eng: "build it this way"
+#   → build (parallel) backend + frontend
+#   → test             adversarial suite
+#   → [test-gate]      Eng: "which findings block merge?"
+#   → review           DoD + contract + plan compliance
+#   → [merge-gate]     Eng: "merge-ready?"
+#   → open-pr
+
+name: AI Feature Delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      intent:
+        description: "What to build (plain English)"
+        required: true
+        type: string
+      prototype_url:
+        description: "v0 or prototype URL (leave blank to skip visual step)"
+        required: false
+        type: string
+      branch:
+        description: "Branch name (leave blank to auto-generate)"
+        required: false
+        type: string
+
+env:
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+
+  # ── Bootstrap ─────────────────────────────────────────────────────────────────
+  bootstrap:
+    name: "Create feature branch"
+    runs-on: ubuntu-latest
+    outputs:
+      branch: ${{ steps.branch.outputs.name }}
+      timestamp: ${{ steps.branch.outputs.timestamp }}
+      has_prototype: ${{ steps.branch.outputs.has_prototype }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve branch and flags
+        id: branch
+        run: |
+          TS=$(date +%Y%m%d-%H%M%S)
+          BRANCH="${{ inputs.branch }}"
+          BRANCH="${BRANCH:-ai/feature-${TS}}"
+          HAS_PROTO="false"
+          if [ -n "${{ inputs.prototype_url }}" ]; then
+            HAS_PROTO="true"
+          fi
+          echo "name=${BRANCH}" >> $GITHUB_OUTPUT
+          echo "timestamp=${TS}" >> $GITHUB_OUTPUT
+          echo "has_prototype=${HAS_PROTO}" >> $GITHUB_OUTPUT
+
+      - name: Create and push branch
+        run: |
+          git checkout -b "${{ steps.branch.outputs.name }}"
+          git push origin "${{ steps.branch.outputs.name }}"
+
+
+  # ── Step 1: Visual — read prototype ──────────────────────────────────────────
+  # Runs only when a prototype URL is provided.
+  # Reads the PM's prototype and produces a structured UI spec.
+  # The architect reads this spec — it grounds the contract in real UI.
+  visual:
+    name: "Visual: read prototype → ui-spec"
+    needs: bootstrap
+    runs-on: ubuntu-latest
+    if: needs.bootstrap.outputs.has_prototype == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run visual agent
+        env:
+          PROTOTYPE_URL: ${{ inputs.prototype_url }}
+          INTENT: ${{ inputs.intent }}
+        run: |
+          AGENT=$(cat .claude/agents/visual.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          Read the PM prototype and produce design/ui-spec.md.
+
+          Prototype URL: ${PROTOTYPE_URL}
+          Feature intent (context only): ${INTENT}
+
+          Use web fetch to read the prototype URL.
+          Extract the design structure — pages, components, interactions, data shapes.
+          Do not read or copy any generated code from the prototype.
+          Follow your output format exactly.
+          Output your Done Signal when complete.
+          "
+
+      - name: Commit ui-spec
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          mkdir -p design
+          git add design/ui-spec.md
+          git diff --staged --quiet || \
+            git commit -m "design: ui-spec from prototype — PENDING_PM_APPROVAL [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ui-spec
+          path: design/ui-spec.md
+
+
+  # ── Gate 1: PM approves the UI spec ──────────────────────────────────────────
+  # PM reviews: "did the agent understand my design correctly?"
+  # PM should also answer any ambiguities flagged in the spec by editing
+  # design/ui-spec.md directly before approving.
+  # If no prototype was provided this gate is skipped automatically.
+  pm-gate:
+    name: "GATE 1: PM approves UI spec"
+    needs: [bootstrap, visual]
+    runs-on: ubuntu-latest
+    if: needs.bootstrap.outputs.has_prototype == 'true'
+    environment: pm-gate
+    steps:
+      - run: echo "UI spec approved. Proceeding to contract planning."
+
+
+  # ── Step 2: Plan — API Contract ───────────────────────────────────────────────
+  # Architect phase 1. Reads the PM-approved ui-spec (if present) + skill files.
+  # Produces the API contract grounded in real UI data shapes.
+  # Every endpoint maps to a visible component or interaction.
+  plan:
+    name: "Plan 1/2: API contract"
+    needs: [bootstrap, pm-gate]
+    runs-on: ubuntu-latest
+    # Run after pm-gate if prototype was provided, otherwise after bootstrap
+    if: always() && (needs.pm-gate.result == 'success' || needs.bootstrap.outputs.has_prototype == 'false')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run architect — Phase 1
+        env:
+          INTENT: ${{ inputs.intent }}
+        run: |
+          AGENT=$(cat .claude/agents/architect.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          ## Phase 1: API Contract
+
+          Read in this order before doing anything:
+          - design/ui-spec.md (if it exists — it is PM-approved)
+          - config/harness.config.yaml
+          - .claude/skills/codebase/architecture.md
+          - .claude/skills/codebase/api-patterns.md
+          - .claude/skills/codebase/data-patterns.md
+          - api-contract.yaml (existing)
+          - escalation/log/ (recent resolutions)
+
+          Feature intent: ${INTENT}
+
+          Produce:
+          1. Append to api-contract.yaml — status: PENDING_APPROVAL
+             Every endpoint must serve a component or interaction from the ui-spec.
+          2. Write tasks/current-feature.md — task breakdown per agent
+
+          Do not write any implementation plan or application code.
+          If design/ui-spec.md has unresolved ambiguities, escalate and stop.
+          Output your Phase 1 Done Signal when complete.
+          "
+
+      - name: Commit contract
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add api-contract.yaml tasks/current-feature.md escalation/
+          git diff --staged --quiet || \
+            git commit -m "plan(contract): API contract — PENDING_APPROVAL [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contract
+          path: |
+            api-contract.yaml
+            tasks/current-feature.md
+
+
+  # ── Gate 2: PM + Eng approve the contract ────────────────────────────────────
+  # Reviewing: what endpoints will exist, request/response shapes, schemas.
+  # The contract is grounded in the ui-spec — every endpoint serves real UI.
+  # Not reviewing: how it gets built, data model, file structure.
+  plan-gate:
+    name: "GATE 2: Approve API contract"
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: plan-gate
+    steps:
+      - run: echo "Contract approved. Proceeding to implementation planning."
+
+
+  # ── Step 3: Plan — Implementation Plan ───────────────────────────────────────
+  # Architect phase 2. The detailed how.
+  # Data model, shared types (both sides agree here), file list,
+  # service logic spec, component tree mapped to ui-spec, decisions, open questions.
+  plan-impl:
+    name: "Plan 2/2: Implementation plan"
+    needs: [bootstrap, plan-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run architect — Phase 2
+        run: |
+          AGENT=$(cat .claude/agents/architect.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          ## Phase 2: Implementation Plan
+
+          The contract has been approved by humans.
+
+          Read in this order:
+          - api-contract.yaml (confirm status is APPROVED — stop if not)
+          - design/ui-spec.md (component inventory and component tree sections)
+          - tasks/current-feature.md
+          - .claude/skills/codebase/architecture.md
+          - .claude/skills/codebase/api-patterns.md
+          - .claude/skills/codebase/data-patterns.md
+          - .claude/skills/codebase/frontend-patterns.md
+
+          Produce tasks/implementation-plan.md — follow your Phase 2 output format exactly:
+          - Data model (tables, columns, types, constraints, migrations)
+          - Shared Types (Pydantic + TypeScript — both sides, verbatim)
+          - Backend files to create
+          - Backend service logic (pseudocode spec — no real code)
+          - Frontend files to create (with ui-spec reference for each component)
+          - Frontend component tree (annotated with server/client + API calls)
+          - Decisions made (with reasoning and rejected alternatives)
+          - Testability notes
+          - Open questions (with stated defaults)
+
+          Do not write any application code.
+          Output your Phase 2 Done Signal when complete.
+          "
+
+      - name: Commit implementation plan
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add tasks/implementation-plan.md escalation/
+          git diff --staged --quiet || \
+            git commit -m "plan(impl): implementation plan — PENDING_APPROVAL [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: implementation-plan
+          path: tasks/implementation-plan.md
+
+
+  # ── Gate 3: Eng approves the implementation plan ─────────────────────────────
+  # Reviewing: data model, shared types, file structure, service logic,
+  # component tree, every architectural decision.
+  # Open questions list defaults — edit the plan to override before approving.
+  # Last checkpoint before code is written.
+  impl-gate:
+    name: "GATE 3: Approve implementation plan"
+    needs: plan-impl
+    runs-on: ubuntu-latest
+    environment: impl-gate
+    steps:
+      - run: echo "Implementation plan approved. Starting parallel build."
+
+
+  # ── Step 4: Build — parallel ─────────────────────────────────────────────────
+  # Both agents read tasks/implementation-plan.md as primary source of truth.
+  # Shared Types section is the coordination point — both implement the same
+  # types independently. They cannot diverge because types are written out.
+  # Frontend also reads design/ui-spec.md as layout reference — not for code.
+  build-backend:
+    name: "Build: backend"
+    needs: [bootstrap, impl-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run backend agent
+        run: |
+          AGENT=$(cat .claude/agents/backend.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          Read in this order before writing any code:
+          1. tasks/implementation-plan.md — primary source of truth
+          2. api-contract.yaml — confirm APPROVED
+          3. .claude/skills/codebase/api-patterns.md
+          4. .claude/skills/codebase/data-patterns.md
+          5. tasks/current-feature.md — mark backend tasks done as you go
+
+          Build the complete backend implementation.
+          Implement exactly what the plan describes — no more, no less.
+          All code in backend/.
+          Output your Done Signal when complete.
+          "
+
+      - name: Commit backend
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add backend/ tasks/ escalation/
+          git diff --staged --quiet || \
+            git commit -m "build(backend): implement per approved plan [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+  build-frontend:
+    name: "Build: frontend"
+    needs: [bootstrap, impl-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run frontend agent
+        run: |
+          AGENT=$(cat .claude/agents/frontend.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          Read in this order before writing any code:
+          1. tasks/implementation-plan.md — primary source of truth
+          2. design/ui-spec.md — layout and interaction reference (do not copy code)
+          3. api-contract.yaml — confirm APPROVED
+          4. .claude/skills/codebase/frontend-patterns.md
+          5. .claude/skills/codebase/architecture.md
+          6. tasks/current-feature.md — mark frontend tasks done as you go
+
+          Build the complete frontend implementation from scratch.
+          Use the ui-spec for what to build and how it should look.
+          Use the patterns for how to build it.
+          All code in frontend/.
+          Output your Done Signal when complete.
+          "
+
+      - name: Commit frontend
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add frontend/ tasks/ escalation/
+          git diff --staged --quiet || \
+            git commit -m "build(frontend): implement per approved plan [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+
+  # ── Step 5: Test ──────────────────────────────────────────────────────────────
+  test:
+    name: "Test: adversarial suite"
+    needs: [bootstrap, build-backend, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run tester agent
+        env:
+          TS: ${{ needs.bootstrap.outputs.timestamp }}
+        run: |
+          AGENT=$(cat .claude/agents/tester.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          Read:
+          - .claude/skills/testing/test-patterns.md
+          - api-contract.yaml
+          - tasks/implementation-plan.md (use decisions + service logic for adversarial coverage)
+
+          Write adversarial tests for everything in backend/ and frontend/.
+          Run all tests.
+          Document findings in escalation/log/test-findings-${TS}.yaml
+
+          Do not fix anything. Find and document only.
+          "
+
+      - name: Commit tests and findings
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add backend/tests/ frontend/src/ escalation/log/
+          git diff --staged --quiet || \
+            git commit -m "test: adversarial suite [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: test-findings
+          path: escalation/log/test-findings-*.yaml
+
+
+  # ── Gate 4: Eng triages test findings ────────────────────────────────────────
+  # Download and review test-findings artifact.
+  # Decide which findings block merge — not all do.
+  # Approve to continue to review. Reject to send back for fixes.
+  test-gate:
+    name: "GATE 4: Triage test findings"
+    needs: test
+    runs-on: ubuntu-latest
+    environment: test-gate
+    steps:
+      - run: echo "Test findings triaged. Proceeding to review."
+
+
+  # ── Step 6: Review ────────────────────────────────────────────────────────────
+  review:
+    name: "Review: DoD + contract + plan compliance"
+    needs: [bootstrap, test-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run reviewer agent
+        env:
+          TS: ${{ needs.bootstrap.outputs.timestamp }}
+        run: |
+          AGENT=$(cat .claude/agents/reviewer.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            -p "
+          Read:
+          - .claude/skills/delivery/definition-of-done.md
+          - .claude/skills/codebase/api-patterns.md
+          - .claude/skills/codebase/frontend-patterns.md
+          - api-contract.yaml
+          - tasks/implementation-plan.md
+          - design/ui-spec.md (if present — verify UI matches spec intent)
+
+          Review the full implementation against:
+          1. The approved contract — every endpoint, every schema
+          2. The approved implementation plan — every file, every decision
+          3. The definition of done
+          4. All code patterns
+          5. The ui-spec — does the frontend match what the PM designed?
+
+          Also check: did build agents deviate from the plan?
+          If so, was it justified by an escalation, or undocumented?
+
+          Write your full report to escalation/log/review-${TS}.yaml
+          Mark any pattern worth keeping as promote: true
+          "
+
+      - name: Commit review report
+        run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
+          git add escalation/log/
+          git diff --staged --quiet || \
+            git commit -m "review: DoD + plan + ui compliance report [skip ci]"
+          git push origin "${{ needs.bootstrap.outputs.branch }}"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: review-report
+          path: escalation/log/review-*.yaml
+
+
+  # ── Gate 5: Eng approves merge ───────────────────────────────────────────────
+  merge-gate:
+    name: "GATE 5: Approve for merge"
+    needs: review
+    runs-on: ubuntu-latest
+    environment: merge-gate
+    steps:
+      - run: echo "Approved. Opening PR."
+
+
+  # ── Open PR ───────────────────────────────────────────────────────────────────
+  open-pr:
+    name: "Open pull request"
+    needs: [bootstrap, merge-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PROTO_LINE=""
+          if [ -n "${{ inputs.prototype_url }}" ]; then
+            PROTO_LINE="- Prototype: \`${{ inputs.prototype_url }}\`"
+          fi
+
+          gh pr create \
+            --title "feat: ${{ inputs.intent }}" \
+            --body "## AI-Delivered Feature
+
+          **Intent**: \`${{ inputs.intent }}\`
+          ${PROTO_LINE}
+
+          ### Human Gates Passed
+
+          | Gate | Who | What was reviewed |
+          |------|-----|-------------------|
+          | ✅ Gate 1: UI Spec | PM | Visual agent understood the prototype correctly |
+          | ✅ Gate 2: Contract | PM + Eng | API surface, endpoint shapes, schemas |
+          | ✅ Gate 3: Impl Plan | Eng | Data model, shared types, file structure, decisions |
+          | ✅ Gate 4: Test findings | Eng | Adversarial test results triaged |
+          | ✅ Gate 5: Merge | Eng | DoD + plan + UI compliance reviewed |
+
+          ### Artefacts
+          - UI spec: \`design/ui-spec.md\`
+          - Contract: \`api-contract.yaml\`
+          - Implementation plan: \`tasks/implementation-plan.md\`
+          - Test findings: \`escalation/log/test-findings-*.yaml\`
+          - Review report: \`escalation/log/review-*.yaml\`
+
+          ---
+          *Delivered by vibe-harness. Merge when ready.*" \
+            --base main \
+            --head "${{ needs.bootstrap.outputs.branch }}"

@@ -1,0 +1,44 @@
+# Example escalation log entry — delete this file in production use
+
+id: "2026-03-08T14-32-00-contract_conflict"
+timestamp: "2026-03-08T14:32:00Z"
+type: contract_conflict
+raised_by: ["frontend_teammate", "backend_teammate"]
+status: resolved
+
+description: |
+  Frontend teammate is treating userId as a string (UUID format) based on the
+  existing user profile endpoints. Backend teammate has implemented it as an
+  integer (auto-increment) to match the database schema.
+
+options:
+  - id: A
+    label: "String (UUID)"
+    description: "Change BE to use UUID. Align with profile endpoints."
+    implication: "Requires migration. Breaking change if other services consume this."
+    agent_preference: false
+  - id: B
+    label: "Integer (auto-increment)"
+    description: "FE adapts to cast/handle integer. No migration needed."
+    implication: "FE must handle type coercion. Inconsistent with profile endpoints."
+    agent_preference: true
+
+agent_default:
+  choice: B
+  reasoning: "Matches current DB schema, no migration required"
+
+blast_radius: medium
+blast_reasoning: "Would require a migration to fix later if wrong choice made"
+waiting_on: tech_lead
+
+context_files:
+  - "api-contract.yaml"
+  - "src/models/user.ts"
+
+resolution:
+  timestamp: "2026-03-08T14:45:00Z"
+  resolved_by: "tech_lead"
+  choice: A
+  reasoning: "UUID aligns with our auth service. Accept the migration cost."
+  promote_to_knowledge: true
+  knowledge_note: "userId is always UUID string across all services. See K2 system context."
