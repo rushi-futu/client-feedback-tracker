@@ -28,8 +28,7 @@
 #   → [plan-gate]      PM + Eng: "is this the right API surface?"
 #   → plan-impl        architect phase 2 → implementation-plan.md
 #   → [impl-gate]      Eng: "build it this way"
-#   → build-backend     backend implementation
-#   → build-frontend    frontend implementation (reads backend code)
+#   → build (parallel) backend + frontend
 #   → test             adversarial suite
 #   → [test-gate]      Eng: "which findings block merge?"
 #   → review           DoD + contract + plan compliance
@@ -194,7 +193,6 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 40 \
             -p "
           ## Phase 1: API Contract
 
@@ -289,7 +287,6 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 40 \
             -p "
           ## Phase 2: Implementation Plan
 
@@ -346,10 +343,14 @@ jobs:
     if: always() && needs.plan-impl.result == 'success'
     environment: impl-gate
     steps:
-      - run: echo "Implementation plan approved. Starting slice-by-slice build."
+      - run: echo "Implementation plan approved. Starting parallel build."
 
 
-  # ── Step 4a: Build — backend ─────────────────────────────────────────────────
+  # ── Step 4: Build — parallel ─────────────────────────────────────────────────
+  # Both agents read tasks/implementation-plan.md as primary source of truth.
+  # Shared Types section is the coordination point — both implement the same
+  # types independently. They cannot diverge because types are written out.
+  # Frontend also reads design/ui-spec.md as layout reference — not for code.
   build-backend:
     name: "Build: backend"
     needs: [bootstrap, impl-gate]
@@ -373,7 +374,6 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 50 \
             -p "
           Read in this order before writing any code:
           1. tasks/implementation-plan.md — primary source of truth
@@ -388,7 +388,7 @@ jobs:
           Output your Done Signal when complete.
           "
 
-      - name: Commit and push backend
+      - name: Commit backend
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
@@ -397,12 +397,11 @@ jobs:
             git commit -m "build(backend): implement per approved plan [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"
 
-  # ── Step 4b: Build — frontend (after backend) ──────────────────────────────
   build-frontend:
     name: "Build: frontend"
-    needs: [bootstrap, build-backend]
+    needs: [bootstrap, impl-gate]
     runs-on: ubuntu-latest
-    if: always() && needs.build-backend.result == 'success'
+    if: always() && needs.impl-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -421,28 +420,23 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 50 \
             -p "
           Read in this order before writing any code:
           1. tasks/implementation-plan.md — primary source of truth
           2. design/ui-spec.md — layout and interaction reference (do not copy code)
-          3. Read the backend code already built:
-             - backend/app/schemas/ — actual Pydantic schemas
-             - backend/app/routers/ — actual endpoints and query params
-          4. api-contract.yaml — confirm APPROVED
-          5. .claude/skills/codebase/frontend-patterns.md
-          6. .claude/skills/codebase/architecture.md
-          7. tasks/current-feature.md — mark frontend tasks done as you go
+          3. api-contract.yaml — confirm APPROVED
+          4. .claude/skills/codebase/frontend-patterns.md
+          5. .claude/skills/codebase/architecture.md
+          6. tasks/current-feature.md — mark frontend tasks done as you go
 
           Build the complete frontend implementation from scratch.
-          The backend is already built — read it.
           Use the ui-spec for what to build and how it should look.
           Use the patterns for how to build it.
           All code in frontend/.
           Output your Done Signal when complete.
           "
 
-      - name: Commit and push frontend
+      - name: Commit frontend
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
@@ -455,9 +449,9 @@ jobs:
   # ── Step 5: Test ──────────────────────────────────────────────────────────────
   test:
     name: "Test: adversarial suite"
-    needs: [bootstrap, build-frontend]
+    needs: [bootstrap, build-backend, build-frontend]
     runs-on: ubuntu-latest
-    if: always() && needs.build-frontend.result == 'success'
+    if: always() && needs.build-backend.result == 'success' && needs.build-frontend.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -482,7 +476,6 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 60 \
             -p "
           Read:
           - .claude/skills/testing/test-patterns.md
@@ -551,7 +544,6 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
-            --max-turns 40 \
             -p "
           Read:
           - .claude/skills/delivery/definition-of-done.md
