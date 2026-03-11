@@ -399,9 +399,9 @@ jobs:
 
   build-frontend:
     name: "Build: frontend"
-    needs: [bootstrap, impl-gate]
+    needs: [bootstrap, build-backend]
     runs-on: ubuntu-latest
-    if: always() && needs.impl-gate.result == 'success'
+    if: always() && needs.build-backend.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
