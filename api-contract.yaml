@@ -1,0 +1,112 @@
+# Feature: Client Feedback Tracker
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+endpoints:
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackTable component — returns all feedback items sorted by created_at DESC"
+    query_params:
+      client_name:
+        type: string
+        required: false
+        purpose: "FilterBar client name text search — partial match, case-insensitive"
+      theme:
+        type: string
+        required: false
+        enum: [UX, Performance, Support, Pricing, Communication]
+        purpose: "FilterBar theme dropdown"
+      status:
+        type: string
+        required: false
+        enum: [open, in_progress, actioned]
+        purpose: "FilterBar status dropdown"
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    request:
+      body:
+        client_name: string
+        summary: string
+        detail: string | null
+        theme: "UX|Performance|Support|Pricing|Communication"
+        status: "open|in_progress|actioned"
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Loads FeedbackDetailPage — single item for edit form"
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: "Feedback item not found" }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) submission on /feedback/[id]"
+    request:
+      body:
+        client_name: string | null
+        summary: string | null
+        detail: string | null
+        theme: "UX|Performance|Support|Pricing|Communication" | null
+        status: "open|in_progress|actioned" | null
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Delete button on FeedbackDetailPage — after confirm dialog"
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: "Feedback item not found" }
+
+schemas:
+  FeedbackItemRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: "UX|Performance|Support|Pricing|Communication"
+      status: "open|in_progress|actioned"
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+
+  FeedbackItemCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: "UX|Performance|Support|Pricing|Communication"
+      status: "open|in_progress|actioned"
+    required: [client_name, summary, theme]
+    defaults:
+      status: "open"
+
+  FeedbackItemUpdate:
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: "UX|Performance|Support|Pricing|Communication" | null
+      status: "open|in_progress|actioned" | null
+    required: []
