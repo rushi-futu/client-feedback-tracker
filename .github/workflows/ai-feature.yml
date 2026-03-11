@@ -193,6 +193,7 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
+            --max-turns 40 \
             -p "
           ## Phase 1: API Contract
 
@@ -287,6 +288,7 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
+            --max-turns 40 \
             -p "
           ## Phase 2: Implementation Plan
 
@@ -395,6 +397,7 @@ jobs:
             claude \
               --system-prompt "$BE_AGENT" \
               --dangerously-skip-permissions \
+              --max-turns 50 \
               -p "
             You are building **Slice ${i}** (of ${SLICE_COUNT}).
 
@@ -423,6 +426,7 @@ jobs:
             claude \
               --system-prompt "$FE_AGENT" \
               --dangerously-skip-permissions \
+              --max-turns 50 \
               -p "
             You are building **Slice ${i}** (of ${SLICE_COUNT}).
 
@@ -487,6 +491,7 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
+            --max-turns 60 \
             -p "
           Read:
           - .claude/skills/testing/test-patterns.md
@@ -555,6 +560,7 @@ jobs:
           claude \
             --system-prompt "$AGENT" \
             --dangerously-skip-permissions \
+            --max-turns 40 \
             -p "
           Read:
           - .claude/skills/delivery/definition-of-done.md

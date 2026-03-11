@@ -26,10 +26,15 @@ BLOCKED_PATTERNS=(
   "git push --force"
   "git push -f"
   "git reset --hard HEAD"    # Can lose untracked work
-  "npx --yes"                # Arbitrary remote package execution
-  "curl.*|.*sh"              # Pipe-to-shell pattern
-  "wget.*|.*sh"
+  "curl.*\|.*bash"           # Pipe-to-bash pattern (curl ... | bash)
+  "curl.*\|.*\/bin\/sh"      # Pipe-to-sh pattern (curl ... | /bin/sh)
+  "wget.*\|.*bash"           # Pipe-to-bash pattern (wget ... | bash)
+  "wget.*\|.*\/bin\/sh"      # Pipe-to-sh pattern (wget ... | /bin/sh)
 )
+# NOTE: "npx --yes" removed — agents need npx for scaffolding (create-next-app, shadcn).
+# Package execution is constrained by the devcontainer firewall, not bash guards.
+# NOTE: "curl.*|.*sh" was too broad — matched any command with "sh" anywhere.
+# Replaced with specific pipe-to-shell patterns.
 
 for pattern in "${BLOCKED_PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qiE "$pattern"; then

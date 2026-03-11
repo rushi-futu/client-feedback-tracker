@@ -19,15 +19,19 @@ fi
 # Agents must NEVER directly modify these — escalate instead.
 # Add your project's critical files here.
 PROTECTED_PATTERNS=(
-  "*.env"
-  "*.env.*"
-  "prisma/schema.prisma"          # Schema changes need human review
-  "src/auth/**"                   # Auth logic — human sign-off required
-  "src/payments/**"               # Payment logic — human sign-off required
-  "migrations/**"                 # DB migrations — human sign-off required
-  ".claude/settings.json"         # Agents cannot modify their own hooks
-  "harness-rules/**"              # Agents cannot modify architectural rules
+  ".env"                            # Root .env file
+  ".env.local"                      # Local env overrides
+  ".env.production"                 # Production env
+  ".env.production.*"               # Production env variants
+  "prisma/schema.prisma"            # Schema changes need human review
+  "src/auth/**"                     # Auth logic — human sign-off required
+  "src/payments/**"                 # Payment logic — human sign-off required
+  ".claude/settings.json"           # Agents cannot modify their own hooks
+  "harness-rules/**"                # Agents cannot modify architectural rules
 )
+# NOTE: migrations/** removed — backend agent creates migrations as part of normal work.
+# NOTE: *.env.* replaced with specific .env files — the glob was too broad,
+# matching alembic/env.py, .env.example, and other legitimate files.
 
 for pattern in "${PROTECTED_PATTERNS[@]}"; do
   # Use bash glob matching
