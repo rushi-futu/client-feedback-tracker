@@ -1,7 +1,7 @@
 # API Contract — Client Feedback Tracker
 # Feature: Client Feedback CRUD
 # Added: 2026-03-11
-# Status: PENDING_APPROVAL
+# Status: APPROVED
 # UI source: design/ui-spec.md
 
 endpoints:
