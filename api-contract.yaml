@@ -1,0 +1,165 @@
+# Feature: Client Feedback Tracker — Core Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+#
+# Note on ui-spec approval: design/ui-spec.md is PENDING_PM_APPROVAL at time of
+# writing. The spec contains zero unresolved ambiguities and the feature intent
+# matches the spec verbatim. All endpoints below are grounded in ui-spec.md
+# components and interactions. A PM approval gate must be cleared before this
+# contract is approved and any code is written.
+
+endpoints:
+
+  # ── LIST ─────────────────────────────────────────────────────────────────
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackListPage → FeedbackTable component.
+      Returns all feedback items sorted by created_at descending (newest first).
+      Filtering is applied client-side — no query parameters needed.
+      ui-spec ref: "FeedbackTable — Rows sorted by date logged descending"
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  # ── CREATE ────────────────────────────────────────────────────────────────
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission on /feedback/new.
+      client_name and summary are required per ui-spec validation rules.
+      status defaults to "open" — matches ui-spec "required, default: open".
+      ui-spec ref: "FeedbackForm (create mode) — Submit button: Save Feedback"
+    request:
+      body:
+        client_name: string          # required
+        summary: string              # required
+        detail: "string | null"      # optional — omit or send null
+        theme: FeedbackTheme         # required
+        status: FeedbackStatus       # optional, defaults to open
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }     # FastAPI/Pydantic validation error
+
+  # ── GET BY ID ─────────────────────────────────────────────────────────────
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Feeds FeedbackForm (edit mode) on /feedback/[id].
+      Pre-populates all form fields for editing.
+      ui-spec ref: "FeedbackForm (edit mode) — Same fields as create mode, pre-populated"
+    path_params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+
+  # ── UPDATE ────────────────────────────────────────────────────────────────
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission on /feedback/[id].
+      PATCH semantics — only provided fields are updated.
+      Status change (e.g. marking actioned) flows through this endpoint.
+      ui-spec ref: "FeedbackForm (edit mode) — Submit button: Save Changes"
+    path_params:
+      id: uuid
+    request:
+      body:
+        client_name: "string | null"    # optional
+        summary: "string | null"        # optional
+        detail: "string | null"         # optional; send null to clear the field
+        theme: "FeedbackTheme | null"   # optional
+        status: "FeedbackStatus | null" # optional — this is how actioned is set
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  # ── DELETE ────────────────────────────────────────────────────────────────
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles delete button on FeedbackDetailPage, invoked after browser
+      confirm dialog. Returns 204 No Content on success.
+      ui-spec ref: "Delete button (bottom of form, secondary/destructive style)
+      — confirms before deleting → redirects to /feedback"
+    path_params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+# ── SCHEMAS ───────────────────────────────────────────────────────────────────
+
+schemas:
+
+  FeedbackTheme:
+    type: enum
+    description: "Fixed set of themes — not user-managed (ui-spec: 'theme is a fixed enum, not user-managed tags')"
+    values:
+      - UX
+      - Performance
+      - Support
+      - Pricing
+      - Communication
+
+  FeedbackStatus:
+    type: enum
+    description: "Three-value lifecycle status — not a boolean (ui-spec: 'status is a 3-value enum, not a boolean')"
+    values:
+      - open
+      - in_progress
+      - actioned
+
+  FeedbackItemRead:
+    description: "Full representation of a feedback item — returned by all endpoints"
+    fields:
+      id:          uuid
+      client_name: string
+      summary:     string
+      detail:      "string | null"
+      theme:       FeedbackTheme
+      status:      FeedbackStatus
+      created_at:  datetime
+      updated_at:  datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+    notes:
+      - "detail is nullable — omitted on creation becomes null in response"
+      - "id is UUID not integer — ui-spec explicitly specifies uuid type"
+
+  FeedbackItemCreate:
+    description: "Request body for POST /feedback/"
+    fields:
+      client_name: string
+      summary:     string
+      detail:      "string | null"
+      theme:       FeedbackTheme
+      status:      FeedbackStatus
+    required: [client_name, summary, theme]
+    defaults:
+      status: open
+      detail: null
+
+  FeedbackItemUpdate:
+    description: "Request body for PATCH /feedback/{id} — all fields optional"
+    fields:
+      client_name: "string | None"
+      summary:     "string | None"
+      detail:      "string | None"
+      theme:       "FeedbackTheme | None"
+      status:      "FeedbackStatus | None"
+    required: []
+    notes:
+      - "PATCH semantics — only fields present in the request body are updated"
+      - "exclude_unset=True must be used in the router (see api-patterns.md)"
