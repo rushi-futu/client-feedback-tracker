@@ -1,0 +1,171 @@
+# API Contract — Client Feedback Tracker
+# This file is the single source of truth for all API endpoints.
+# Both backend and frontend agents build against this file.
+# Never change an approved endpoint without a new human gate.
+
+# ─────────────────────────────────────────────────────────────────────
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+# ─────────────────────────────────────────────────────────────────────
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackTable in FeedbackListPage (/feedback).
+      Returns all feedback items sorted by created_at descending (newest first).
+      All filtering is performed client-side; no query params on this endpoint.
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission on /feedback/new.
+      Creates a new feedback item. status defaults to "open" when not supplied.
+    request:
+      body:
+        client_name: string          # required
+        summary: string              # required
+        detail: "string | null"      # optional
+        theme: "FeedbackTheme enum"  # required
+        status: "FeedbackStatus enum"  # optional — defaults to open
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Pre-populates FeedbackForm (edit mode) on /feedback/[id].
+      Returns a single feedback item by its UUID.
+    path_params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission on /feedback/[id].
+      Partial update — only supplied fields are changed.
+      This is the only way to change status (not inline in the list).
+    path_params:
+      id: uuid
+    request:
+      body:
+        client_name: "string | null"   # optional
+        summary: "string | null"       # optional
+        detail: "string | null"        # optional
+        theme: "FeedbackTheme | null"  # optional
+        status: "FeedbackStatus | null"  # optional
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles the Delete button on FeedbackDetailPage (/feedback/[id]).
+      Browser confirm dialog is shown before this request is sent.
+      On success, frontend redirects to /feedback.
+    path_params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+# ─────────────────────────────────────────────────────────────────────
+# Schemas
+# ─────────────────────────────────────────────────────────────────────
+
+schemas:
+
+  FeedbackTheme:
+    type: enum (string)
+    values:
+      - UX
+      - Performance
+      - Support
+      - Pricing
+      - Communication
+    source: design/ui-spec.md § FeedbackForm fields — Theme select
+
+  FeedbackStatus:
+    type: enum (string)
+    values:
+      - open
+      - in_progress
+      - actioned
+    source: design/ui-spec.md § FeedbackForm fields — Status select
+
+  FeedbackCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus   # optional in request — backend defaults to "open"
+    required: [client_name, summary, theme]
+
+  FeedbackUpdate:
+    fields:
+      client_name: "string | null"
+      summary: "string | null"
+      detail: "string | null"
+      theme: "FeedbackTheme | null"
+      status: "FeedbackStatus | null"
+    required: []    # all fields optional — PATCH semantics
+
+  FeedbackRead:
+    fields:
+      id: uuid          # NOTE: uuid, not integer — see assumption below
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+
+# ─────────────────────────────────────────────────────────────────────
+# Assumptions and open questions for reviewers
+# ─────────────────────────────────────────────────────────────────────
+#
+# ASSUMPTION-01 — UUID primary key
+#   The ui-spec explicitly specifies id as uuid (design/ui-spec.md § Data Shapes).
+#   The existing codebase api-patterns.md uses integer auto-increment PKs.
+#   This contract follows the ui-spec. If the team prefers integer IDs, the
+#   contract must be revised before approval — the frontend route /feedback/[id]
+#   works identically with either type.
+#
+# ASSUMPTION-02 — status default
+#   FeedbackForm (create mode) shows status as "required, default: open".
+#   The contract treats status as optional in FeedbackCreate and lets the
+#   backend apply the default. The frontend may pre-select "open" in the form.
+#
+# ASSUMPTION-03 — No server-side filtering
+#   The ui-spec states "Filters on /feedback are client-side — no round trip
+#   needed if all items loaded" (§ Interactions and State). GET /feedback/
+#   returns all items with no query params.
+#
+# ASSUMPTION-04 — Sort order
+#   The ui-spec states "Rows sorted by date logged descending".
+#   The backend applies ORDER BY created_at DESC. The frontend must not
+#   re-sort independently.
