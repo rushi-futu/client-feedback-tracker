@@ -1,0 +1,147 @@
+# API Contract — Client Feedback Tracker
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackListPage → FeedbackTable. Returns all feedback items sorted
+      by created_at descending (newest first). No query params — filtering is
+      client-side per ui-spec (all items loaded on page mount, no pagination).
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission from NewFeedbackPage (/feedback/new).
+      Creates a new feedback item and returns the created resource.
+    request:
+      body:
+        client_name: string          # required
+        summary: string              # required
+        detail: string | null        # optional longer description
+        theme: "ux|performance|support|pricing|communication"   # required
+        status: "open|in_progress|actioned"  # required, default: open
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Feeds FeedbackDetailPage (/feedback/[id]). Returns a single feedback item
+      to pre-populate FeedbackForm in edit mode.
+    path_params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission from FeedbackDetailPage.
+      Partial update — only provided fields are changed. Status field is the
+      mechanism for marking items as actioned (open → in_progress → actioned).
+    path_params:
+      id: uuid
+    request:
+      body:
+        client_name: string | null   # optional
+        summary: string | null       # optional
+        detail: string | null        # optional
+        theme: "ux|performance|support|pricing|communication | null"   # optional
+        status: "open|in_progress|actioned | null"  # optional
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles delete button on FeedbackDetailPage. The UI confirms with a browser
+      dialog before calling this endpoint. Returns 204 on success.
+    path_params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+schemas:
+
+  FeedbackTheme:
+    type: enum (str)
+    values:
+      - ux
+      - performance
+      - support
+      - pricing
+      - communication
+    notes: >
+      Enum values are lowercase for API/DB. UI displays as title-case
+      (UX, Performance, Support, Pricing, Communication).
+
+  FeedbackStatus:
+    type: enum (str)
+    values:
+      - open
+      - in_progress
+      - actioned
+    notes: >
+      Default is 'open' on creation. Status change is made via the edit page
+      only — no inline status change in the list view (per ui-spec).
+
+  FeedbackItemCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: FeedbackTheme
+      status: FeedbackStatus
+    required: [client_name, summary, theme, status]
+    notes: >
+      status defaults to 'open' if not provided by caller —
+      the form always submits it but the API should default gracefully.
+
+  FeedbackItemUpdate:
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: FeedbackTheme | null
+      status: FeedbackStatus | null
+    required: []
+    notes: >
+      All fields optional — PATCH semantics. Backend uses exclude_unset=True.
+      Sending null for detail explicitly clears it.
+
+  FeedbackItemRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: FeedbackTheme
+      status: FeedbackStatus
+      created_at: datetime (ISO 8601, UTC)
+      updated_at: datetime (ISO 8601, UTC)
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+    notes: >
+      id is UUID (not integer) — matches ui-spec data shape.
+      detail may be null/omitted if not provided at creation.
