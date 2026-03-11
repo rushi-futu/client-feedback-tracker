@@ -1,0 +1,109 @@
+# API Contract — Client Feedback Tracker
+# This file is the single source of truth for all API endpoints.
+# Both backend and frontend agents build against this contract.
+
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+endpoints:
+  # --- Feedback ---
+
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackListPage — returns all feedback items for the table view"
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  - method: GET
+    path: /feedback/{feedback_id}
+    purpose: "Feeds FeedbackDetailPage — returns a single feedback item for editing"
+    params:
+      feedback_id: uuid
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission from NewFeedbackPage"
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{feedback_id}
+    purpose: "Handles FeedbackForm (edit mode) submission from FeedbackDetailPage"
+    params:
+      feedback_id: uuid
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{feedback_id}
+    purpose: "Handles delete button on FeedbackDetailPage (after confirm dialog)"
+    params:
+      feedback_id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+schemas:
+  Theme:
+    type: enum
+    values: [UX, Performance, Support, Pricing, Communication]
+    notes: "Fixed set per ui-spec — not user-managed"
+
+  Status:
+    type: enum
+    values: [open, in_progress, actioned]
+    notes: "3-value enum, not boolean. Default: open"
+
+  FeedbackCreate:
+    fields:
+      client_name: string         # required, free text
+      summary: string             # required, short description
+      detail: string | null       # optional longer description
+      theme: Theme                # required
+      status: Status              # required, default: open
+    required: [client_name, summary, theme]
+    notes: "status defaults to 'open' if not provided"
+
+  FeedbackUpdate:
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: Status | null
+    required: []
+    notes: "All fields optional — PATCH semantics, only provided fields are updated"
+
+  FeedbackRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
