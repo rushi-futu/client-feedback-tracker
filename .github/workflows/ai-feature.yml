@@ -242,6 +242,7 @@ jobs:
     name: "GATE 2: Approve API contract"
     needs: plan
     runs-on: ubuntu-latest
+    if: always() && needs.plan.result == 'success'
     environment: plan-gate
     steps:
       - run: echo "Contract approved. Proceeding to implementation planning."
@@ -255,6 +256,7 @@ jobs:
     name: "Plan 2/2: Implementation plan"
     needs: [bootstrap, plan-gate]
     runs-on: ubuntu-latest
+    if: always() && needs.plan-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -266,6 +268,18 @@ jobs:
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
+
+      - name: Mark contract as APPROVED
+        run: |
+          if [ -f api-contract.yaml ]; then
+            sed -i 's/Status: PENDING_APPROVAL/Status: APPROVED/g' api-contract.yaml
+            git config user.name "claude-code[bot]"
+            git config user.email "claude-code[bot]@users.noreply.github.com"
+            git add api-contract.yaml
+            git diff --staged --quiet || \
+              git commit -m "plan(contract): mark contract APPROVED [skip ci]"
+            git push origin "${{ needs.bootstrap.outputs.branch }}"
+          fi
 
       - name: Run architect — Phase 2
         run: |
@@ -326,6 +340,7 @@ jobs:
     name: "GATE 3: Approve implementation plan"
     needs: plan-impl
     runs-on: ubuntu-latest
+    if: always() && needs.plan-impl.result == 'success'
     environment: impl-gate
     steps:
       - run: echo "Implementation plan approved. Starting parallel build."
@@ -340,6 +355,7 @@ jobs:
     name: "Build: backend"
     needs: [bootstrap, impl-gate]
     runs-on: ubuntu-latest
+    if: always() && needs.impl-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -385,6 +401,7 @@ jobs:
     name: "Build: frontend"
     needs: [bootstrap, impl-gate]
     runs-on: ubuntu-latest
+    if: always() && needs.impl-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -434,6 +451,7 @@ jobs:
     name: "Test: adversarial suite"
     needs: [bootstrap, build-backend, build-frontend]
     runs-on: ubuntu-latest
+    if: always() && needs.build-backend.result == 'success' && needs.build-frontend.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -494,6 +512,7 @@ jobs:
     name: "GATE 4: Triage test findings"
     needs: test
     runs-on: ubuntu-latest
+    if: always() && needs.test.result == 'success'
     environment: test-gate
     steps:
       - run: echo "Test findings triaged. Proceeding to review."
@@ -504,6 +523,7 @@ jobs:
     name: "Review: DoD + contract + plan compliance"
     needs: [bootstrap, test-gate]
     runs-on: ubuntu-latest
+    if: always() && needs.test-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -567,6 +587,7 @@ jobs:
     name: "GATE 5: Approve for merge"
     needs: review
     runs-on: ubuntu-latest
+    if: always() && needs.review.result == 'success'
     environment: merge-gate
     steps:
       - run: echo "Approved. Opening PR."
@@ -577,6 +598,7 @@ jobs:
     name: "Open pull request"
     needs: [bootstrap, merge-gate]
     runs-on: ubuntu-latest
+    if: always() && needs.merge-gate.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
