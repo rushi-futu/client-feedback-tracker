@@ -1,17 +1,17 @@
 # Client Feedback CRUD
 
-Status: PENDING_CONTRACT_APPROVAL
+Status: PENDING_PLAN_APPROVAL
 UI Spec: design/ui-spec.md (APPROVED)
 Contract: api-contract.yaml
 
 ## Backend Tasks
 
-- [ ] BE-01: Model — Create `backend/app/models/feedback.py` with Feedback SQLAlchemy model (id, client_name, summary, detail, theme, status, created_at, updated_at)
-- [ ] BE-02: Schemas — Create `backend/app/schemas/feedback.py` with FeedbackCreate, FeedbackUpdate, FeedbackRead Pydantic schemas plus Theme and FeedbackStatus enums
-- [ ] BE-03: Router — Create `backend/app/routers/feedback.py` with GET list, GET by id, POST, PATCH, DELETE endpoints following existing CRUD pattern
-- [ ] BE-04: App registration — Register feedback router in `backend/app/main.py`
-- [ ] BE-05: Migration — Generate Alembic migration for feedback table via `alembic revision --autogenerate`
-- [ ] BE-06: Alembic env — Import feedback model in `backend/alembic/env.py` so autogenerate detects it
+- [x] BE-01: Model — Create `backend/app/models/feedback.py` with Feedback SQLAlchemy model (id, client_name, summary, detail, theme, status, created_at, updated_at)
+- [x] BE-02: Schemas — Create `backend/app/schemas/feedback.py` with FeedbackCreate, FeedbackUpdate, FeedbackRead Pydantic schemas plus Theme and FeedbackStatus enums
+- [x] BE-03: Router — Create `backend/app/routers/feedback.py` with GET list, GET by id, POST, PATCH, DELETE endpoints following existing CRUD pattern
+- [x] BE-04: App registration — Register feedback router in `backend/app/main.py`
+- [x] BE-05: Migration — Generate Alembic migration for feedback table via `alembic revision --autogenerate`
+- [x] BE-06: Alembic env — Import feedback model in `backend/alembic/env.py` so autogenerate detects it
 
 ## Frontend Tasks
 
