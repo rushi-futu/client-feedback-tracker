@@ -1,0 +1,126 @@
+# =============================================================================
+# API Contract — Client Feedback Tracker
+# =============================================================================
+
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+# -----------------------------------------------------------------------------
+# Enums
+# -----------------------------------------------------------------------------
+enums:
+  Theme:
+    values: [UX, Performance, Support, Pricing, Communication]
+    source: "ui-spec.md § FeedbackForm"
+
+  FeedbackStatus:
+    values: [open, in_progress, actioned]
+    source: "ui-spec.md § FeedbackForm"
+
+# -----------------------------------------------------------------------------
+# Endpoints
+# -----------------------------------------------------------------------------
+endpoints:
+  # -- LIST ALL FEEDBACK --
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackListPage — returns all feedback items for client-side filtering"
+    ui_component: "FeedbackTable on /feedback"
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  # -- GET SINGLE FEEDBACK --
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Feeds FeedbackDetailPage — returns one item to pre-populate edit form"
+    ui_component: "FeedbackForm (edit mode) on /feedback/[id]"
+    params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+
+  # -- CREATE FEEDBACK --
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    ui_component: "FeedbackForm (create mode) on /feedback/new"
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+
+  # -- UPDATE FEEDBACK --
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) submission on /feedback/[id]"
+    ui_component: "FeedbackForm (edit mode) on /feedback/[id]"
+    params:
+      id: uuid
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  # -- DELETE FEEDBACK --
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Handles delete button on FeedbackDetailPage — after user confirms"
+    ui_component: "Delete button on /feedback/[id]"
+    params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+# -----------------------------------------------------------------------------
+# Schemas
+# -----------------------------------------------------------------------------
+schemas:
+  FeedbackCreate:
+    purpose: "Request body for POST /feedback/"
+    fields:
+      client_name: string          # required — free text
+      summary: string              # required — short description
+      detail: string | null        # optional — longer description
+      theme: Theme                 # required — enum
+      status: FeedbackStatus       # required — enum, frontend defaults to "open"
+    required: [client_name, summary, theme, status]
+
+  FeedbackUpdate:
+    purpose: "Request body for PATCH /feedback/{id} — all fields optional"
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: FeedbackStatus | null
+    required: []                   # partial update — only set fields are changed
+
+  FeedbackRead:
+    purpose: "Response body — all endpoints that return feedback items"
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
