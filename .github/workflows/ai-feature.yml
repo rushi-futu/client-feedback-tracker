@@ -28,7 +28,8 @@
 #   → [plan-gate]      PM + Eng: "is this the right API surface?"
 #   → plan-impl        architect phase 2 → implementation-plan.md
 #   → [impl-gate]      Eng: "build it this way"
-#   → build            slice-by-slice (backend → frontend per slice)
+#   → build-backend     backend implementation
+#   → build-frontend    frontend implementation (reads backend code)
 #   → test             adversarial suite
 #   → [test-gate]      Eng: "which findings block merge?"
 #   → review           DoD + contract + plan compliance
@@ -348,13 +349,9 @@ jobs:
       - run: echo "Implementation plan approved. Starting slice-by-slice build."
 
 
-  # ── Step 4: Build — vertical slices ──────────────────────────────────────────
-  # Single job, separate steps per agent call for real-time log visibility.
-  # Each step: one agent builds one slice → commit → push.
-  # Max 5 slices supported. Steps for unused slices are skipped via condition.
-  # Frontend runs after backend per slice — can read the actual backend code.
-  build:
-    name: "Build: vertical slices"
+  # ── Step 4a: Build — backend ─────────────────────────────────────────────────
+  build-backend:
+    name: "Build: backend"
     needs: [bootstrap, impl-gate]
     runs-on: ubuntu-latest
     if: always() && needs.impl-gate.result == 'success'
@@ -370,191 +367,97 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Extract slice count from plan
-        id: slices
+      - name: Run backend agent
         run: |
-          COUNT=$(grep -c '^### Slice [0-9]' tasks/implementation-plan.md 2>/dev/null || echo "1")
-          echo "count=${COUNT}" >> $GITHUB_OUTPUT
-          echo "Found ${COUNT} delivery slice(s)"
+          AGENT=$(cat .claude/agents/backend.md)
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            --max-turns 50 \
+            -p "
+          Read in this order before writing any code:
+          1. tasks/implementation-plan.md — primary source of truth
+          2. api-contract.yaml — confirm APPROVED
+          3. .claude/skills/codebase/api-patterns.md
+          4. .claude/skills/codebase/data-patterns.md
+          5. tasks/current-feature.md — mark backend tasks done as you go
 
-      - name: Configure git
+          Build the complete backend implementation.
+          Implement exactly what the plan describes — no more, no less.
+          All code in backend/.
+          Output your Done Signal when complete.
+          "
+
+      - name: Commit and push backend
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
-
-      # ── Slice 1 ──────────────────────────────────────────────────────
-      - name: "Slice 1/${{ steps.slices.outputs.count }} — Backend"
-        run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 1** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 1), api-contract.yaml, .claude/skills/codebase/api-patterns.md, .claude/skills/codebase/data-patterns.md, tasks/current-feature.md.
-          Build ONLY the backend scope for Slice 1. All code in backend/. Output your Done Signal when complete."
-
-      - name: "Slice 1 — Commit + push BE"
-        run: |
           git add backend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(backend): slice 1/${{ steps.slices.outputs.count }} [skip ci]"
+          git diff --staged --quiet || \
+            git commit -m "build(backend): implement per approved plan [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"
 
-      - name: "Slice 1/${{ steps.slices.outputs.count }} — Frontend"
+  # ── Step 4b: Build — frontend (after backend) ──────────────────────────────
+  build-frontend:
+    name: "Build: frontend"
+    needs: [bootstrap, build-backend]
+    runs-on: ubuntu-latest
+    if: always() && needs.build-backend.result == 'success'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.bootstrap.outputs.branch }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run frontend agent
         run: |
           AGENT=$(cat .claude/agents/frontend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 1** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 1), design/ui-spec.md, backend/app/schemas/, backend/app/routers/, api-contract.yaml, .claude/skills/codebase/frontend-patterns.md, .claude/skills/codebase/architecture.md, tasks/current-feature.md.
-          The backend for this slice is already built — read it.
-          Build ONLY the frontend scope for Slice 1. All code in frontend/. Output your Done Signal when complete."
+          claude \
+            --system-prompt "$AGENT" \
+            --dangerously-skip-permissions \
+            --max-turns 50 \
+            -p "
+          Read in this order before writing any code:
+          1. tasks/implementation-plan.md — primary source of truth
+          2. design/ui-spec.md — layout and interaction reference (do not copy code)
+          3. Read the backend code already built:
+             - backend/app/schemas/ — actual Pydantic schemas
+             - backend/app/routers/ — actual endpoints and query params
+          4. api-contract.yaml — confirm APPROVED
+          5. .claude/skills/codebase/frontend-patterns.md
+          6. .claude/skills/codebase/architecture.md
+          7. tasks/current-feature.md — mark frontend tasks done as you go
 
-      - name: "Slice 1 — Commit + push FE"
+          Build the complete frontend implementation from scratch.
+          The backend is already built — read it.
+          Use the ui-spec for what to build and how it should look.
+          Use the patterns for how to build it.
+          All code in frontend/.
+          Output your Done Signal when complete.
+          "
+
+      - name: Commit and push frontend
         run: |
+          git config user.name "claude-code[bot]"
+          git config user.email "claude-code[bot]@users.noreply.github.com"
           git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(frontend): slice 1/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      # ── Slice 2 ──────────────────────────────────────────────────────
-      - name: "Slice 2/${{ steps.slices.outputs.count }} — Backend"
-        if: steps.slices.outputs.count >= 2
-        run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 2** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 2), api-contract.yaml, .claude/skills/codebase/api-patterns.md, .claude/skills/codebase/data-patterns.md, tasks/current-feature.md.
-          Build ONLY the backend scope for Slice 2. Extend existing files where needed. All code in backend/. Output your Done Signal when complete."
-
-      - name: "Slice 2 — Commit + push BE"
-        if: steps.slices.outputs.count >= 2
-        run: |
-          git add backend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(backend): slice 2/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      - name: "Slice 2/${{ steps.slices.outputs.count }} — Frontend"
-        if: steps.slices.outputs.count >= 2
-        run: |
-          AGENT=$(cat .claude/agents/frontend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 2** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 2), design/ui-spec.md, backend/app/schemas/, backend/app/routers/, api-contract.yaml, .claude/skills/codebase/frontend-patterns.md, .claude/skills/codebase/architecture.md, tasks/current-feature.md.
-          The backend for this slice is already built — read it.
-          Build ONLY the frontend scope for Slice 2. Extend existing files where needed. All code in frontend/. Output your Done Signal when complete."
-
-      - name: "Slice 2 — Commit + push FE"
-        if: steps.slices.outputs.count >= 2
-        run: |
-          git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(frontend): slice 2/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      # ── Slice 3 ──────────────────────────────────────────────────────
-      - name: "Slice 3/${{ steps.slices.outputs.count }} — Backend"
-        if: steps.slices.outputs.count >= 3
-        run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 3** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 3), api-contract.yaml, .claude/skills/codebase/api-patterns.md, .claude/skills/codebase/data-patterns.md, tasks/current-feature.md.
-          Build ONLY the backend scope for Slice 3. Extend existing files where needed. All code in backend/. Output your Done Signal when complete."
-
-      - name: "Slice 3 — Commit + push BE"
-        if: steps.slices.outputs.count >= 3
-        run: |
-          git add backend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(backend): slice 3/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      - name: "Slice 3/${{ steps.slices.outputs.count }} — Frontend"
-        if: steps.slices.outputs.count >= 3
-        run: |
-          AGENT=$(cat .claude/agents/frontend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 3** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 3), design/ui-spec.md, backend/app/schemas/, backend/app/routers/, api-contract.yaml, .claude/skills/codebase/frontend-patterns.md, .claude/skills/codebase/architecture.md, tasks/current-feature.md.
-          The backend for this slice is already built — read it.
-          Build ONLY the frontend scope for Slice 3. Extend existing files where needed. All code in frontend/. Output your Done Signal when complete."
-
-      - name: "Slice 3 — Commit + push FE"
-        if: steps.slices.outputs.count >= 3
-        run: |
-          git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(frontend): slice 3/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      # ── Slice 4 ──────────────────────────────────────────────────────
-      - name: "Slice 4/${{ steps.slices.outputs.count }} — Backend"
-        if: steps.slices.outputs.count >= 4
-        run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 4** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 4), api-contract.yaml, .claude/skills/codebase/api-patterns.md, .claude/skills/codebase/data-patterns.md, tasks/current-feature.md.
-          Build ONLY the backend scope for Slice 4. Extend existing files where needed. All code in backend/. Output your Done Signal when complete."
-
-      - name: "Slice 4 — Commit + push BE"
-        if: steps.slices.outputs.count >= 4
-        run: |
-          git add backend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(backend): slice 4/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      - name: "Slice 4/${{ steps.slices.outputs.count }} — Frontend"
-        if: steps.slices.outputs.count >= 4
-        run: |
-          AGENT=$(cat .claude/agents/frontend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 4** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 4), design/ui-spec.md, backend/app/schemas/, backend/app/routers/, api-contract.yaml, .claude/skills/codebase/frontend-patterns.md, .claude/skills/codebase/architecture.md, tasks/current-feature.md.
-          The backend for this slice is already built — read it.
-          Build ONLY the frontend scope for Slice 4. Extend existing files where needed. All code in frontend/. Output your Done Signal when complete."
-
-      - name: "Slice 4 — Commit + push FE"
-        if: steps.slices.outputs.count >= 4
-        run: |
-          git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(frontend): slice 4/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      # ── Slice 5 ──────────────────────────────────────────────────────
-      - name: "Slice 5/${{ steps.slices.outputs.count }} — Backend"
-        if: steps.slices.outputs.count >= 5
-        run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 5** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 5), api-contract.yaml, .claude/skills/codebase/api-patterns.md, .claude/skills/codebase/data-patterns.md, tasks/current-feature.md.
-          Build ONLY the backend scope for Slice 5. Extend existing files where needed. All code in backend/. Output your Done Signal when complete."
-
-      - name: "Slice 5 — Commit + push BE"
-        if: steps.slices.outputs.count >= 5
-        run: |
-          git add backend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(backend): slice 5/${{ steps.slices.outputs.count }} [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
-
-      - name: "Slice 5/${{ steps.slices.outputs.count }} — Frontend"
-        if: steps.slices.outputs.count >= 5
-        run: |
-          AGENT=$(cat .claude/agents/frontend.md)
-          claude --system-prompt "$AGENT" --dangerously-skip-permissions --max-turns 50 -p "
-          You are building **Slice 5** (of ${{ steps.slices.outputs.count }}).
-          Read: tasks/implementation-plan.md (Slice 5), design/ui-spec.md, backend/app/schemas/, backend/app/routers/, api-contract.yaml, .claude/skills/codebase/frontend-patterns.md, .claude/skills/codebase/architecture.md, tasks/current-feature.md.
-          The backend for this slice is already built — read it.
-          Build ONLY the frontend scope for Slice 5. Extend existing files where needed. All code in frontend/. Output your Done Signal when complete."
-
-      - name: "Slice 5 — Commit + push FE"
-        if: steps.slices.outputs.count >= 5
-        run: |
-          git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || git commit -m "build(frontend): slice 5/${{ steps.slices.outputs.count }} [skip ci]"
+          git diff --staged --quiet || \
+            git commit -m "build(frontend): implement per approved plan [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"
 
 
   # ── Step 5: Test ──────────────────────────────────────────────────────────────
   test:
     name: "Test: adversarial suite"
-    needs: [bootstrap, build]
+    needs: [bootstrap, build-frontend]
     runs-on: ubuntu-latest
-    if: always() && needs.build.result == 'success'
+    if: always() && needs.build-frontend.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
