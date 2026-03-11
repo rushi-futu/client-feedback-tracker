@@ -1,0 +1,126 @@
+# API Contract — Client Feedback Tracker
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackTable on FeedbackListPage — returns all feedback items, sorted by created_at descending"
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    request:
+      body:
+        client_name: string        # required
+        summary: string            # required
+        detail: "string | null"    # optional
+        theme: FeedbackTheme       # required
+        status: FeedbackStatus     # required; default applied by server if omitted
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Fetches a single item to pre-populate FeedbackForm (edit mode) on /feedback/[id]"
+    path_params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: "Feedback item not found" }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) Save Changes submission on /feedback/[id]"
+    path_params:
+      id: uuid
+    request:
+      body:
+        client_name: "string | null"       # optional — only provided fields are updated
+        summary: "string | null"           # optional
+        detail: "string | null"            # optional; send null to clear
+        theme: "FeedbackTheme | null"      # optional
+        status: "FeedbackStatus | null"    # optional — primary way to mark items actioned
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Handles Delete button on FeedbackDetailPage — invoked after browser confirm dialog"
+    path_params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: "Feedback item not found" }
+
+schemas:
+
+  FeedbackTheme:
+    type: enum
+    values:
+      - UX
+      - Performance
+      - Support
+      - Pricing
+      - Communication
+    notes: "Fixed enum — not user-managed. Maps to FilterBar theme dropdown and FeedbackForm theme select."
+
+  FeedbackStatus:
+    type: enum
+    values:
+      - open
+      - in_progress
+      - actioned
+    notes: "3-value enum. 'actioned' is the terminal state — item has been addressed."
+
+  FeedbackItemRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+    notes: "detail may be null. Both timestamps always present."
+
+  FeedbackItemCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus
+    required: [client_name, summary, theme]
+    defaults:
+      status: open
+      detail: null
+
+  FeedbackItemUpdate:
+    fields:
+      client_name: "string | null"
+      summary: "string | null"
+      detail: "string | null"
+      theme: "FeedbackTheme | null"
+      status: "FeedbackStatus | null"
+    required: []
+    notes: "All fields optional. PATCH semantics — only provided (non-null) fields are updated. To clear detail, send detail: null explicitly."
