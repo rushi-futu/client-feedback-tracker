@@ -1,0 +1,157 @@
+# API Contract — Client Feedback Tracker
+# This file is the source of truth for the API surface.
+# Both backend and frontend agents build against this contract.
+# DO NOT modify approved sections — append new features below.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackListPage → FeedbackTable. Returns all feedback items sorted
+      by created_at descending (newest first). Filtering is handled client-side;
+      no query parameters needed.
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission on /feedback/new.
+      On success the frontend redirects to /feedback.
+    request:
+      body:
+        client_name: string          # required
+        summary: string              # required
+        detail: "string | null"      # optional — longer description
+        theme: "FeedbackTheme"       # required — ux|performance|support|pricing|communication
+        status: "FeedbackStatus"     # required — default: open
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{feedback_id}
+    purpose: >
+      Feeds FeedbackDetailPage → FeedbackForm (edit mode) on /feedback/[id].
+      Returns the item so the form can pre-populate all fields.
+    path_params:
+      feedback_id: uuid
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{feedback_id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission on /feedback/[id].
+      All fields optional — only sends changed fields. On success the frontend
+      redirects to /feedback.
+    path_params:
+      feedback_id: uuid
+    request:
+      body:
+        client_name: "string | null"
+        summary: "string | null"
+        detail: "string | null"
+        theme: "FeedbackTheme | null"
+        status: "FeedbackStatus | null"
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{feedback_id}
+    purpose: >
+      Handles the Delete button on FeedbackDetailPage. Browser confirm dialog
+      precedes this call. On success the frontend redirects to /feedback.
+    path_params:
+      feedback_id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+
+schemas:
+
+  FeedbackTheme:
+    type: enum
+    values:
+      - ux
+      - performance
+      - support
+      - pricing
+      - communication
+    notes: >
+      Lowercase snake_case values for the API. UI layer maps these to display
+      labels (UX, Performance, Support, Pricing, Communication).
+
+  FeedbackStatus:
+    type: enum
+    values:
+      - open
+      - in_progress
+      - actioned
+    notes: >
+      open = newly logged, not yet being worked on.
+      in_progress = being addressed.
+      actioned = completed / resolved.
+      Default on create: open.
+
+  FeedbackItemRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
+    notes: >
+      detail is nullable — always present in the response body but may be null.
+      Timestamps are UTC ISO-8601.
+
+  FeedbackItemCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: "string | null"
+      theme: FeedbackTheme
+      status: FeedbackStatus
+    required: [client_name, summary, theme, status]
+    notes: >
+      status has server default of "open" — clients should send it explicitly
+      but the server accepts omission and defaults to open.
+
+  FeedbackItemUpdate:
+    fields:
+      client_name: "string | null"
+      summary: "string | null"
+      detail: "string | null"
+      theme: "FeedbackTheme | null"
+      status: "FeedbackStatus | null"
+    required: []
+    notes: >
+      All fields optional. Backend applies only fields present in the request
+      body (exclude_unset=True pattern). Sending null for detail explicitly
+      clears it.
