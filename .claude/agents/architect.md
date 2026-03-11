@@ -155,6 +155,11 @@ Only runs after a human has approved the contract (status: APPROVED).
 This is the document both build agents read before writing a single line of code.
 It eliminates silent decisions. If it's not in the plan, it's not decided.
 
+The plan is organized into **Delivery Slices** — vertical feature slices that are
+built end-to-end (backend then frontend) one at a time. Each slice is a coherent,
+working increment. The frontend agent can see the backend code from the current
+slice when building its part.
+
 ```markdown
 # Implementation Plan: [feature name]
 Status: PENDING_APPROVAL
@@ -190,23 +195,29 @@ These exact types must be used by both agents. Both copy verbatim. No interpreta
 ### Frontend — TypeScript types (frontend/src/types/index.ts)
 [exact interface definitions matching Pydantic schemas field-for-field]
 
-## Backend: Files to Create
+## Delivery Slices
 
+Slices are built in order. Each slice is a vertical feature increment:
+backend agent builds the API/service, then frontend agent builds the UI that uses it.
+Later slices may depend on earlier slices. The frontend agent can read the backend
+code from the current and previous slices.
+
+### Slice 1: [name — e.g. "Core CRUD"]
+**What this delivers**: [user-visible outcome when this slice is done]
+
+**Backend scope**:
 | File | Purpose |
 |------|---------|
 | `backend/app/models/[x].py` | SQLAlchemy model |
 | `backend/app/schemas/[x].py` | Pydantic schemas — use Shared Types above |
 | `backend/app/routers/[x].py` | FastAPI router |
 | `backend/app/services/[x].py` | Business logic |
-| `backend/alembic/versions/[x].py` | Migration |
 
-## Backend: Service Logic
-
-[For each service function: name, inputs, outputs, logic as pseudocode.
+**Backend service logic**:
+[For each service function in this slice: name, inputs, outputs, logic as pseudocode.
 No real code. Enough detail that the agent cannot make a wrong decision.]
 
-## Frontend: Files to Create
-
+**Frontend scope**:
 | File | Purpose | UI Spec reference |
 |------|---------|------------------|
 | `frontend/src/types/index.ts` | TypeScript types | Shared Types above |
@@ -214,20 +225,26 @@ No real code. Enough detail that the agent cannot make a wrong decision.]
 | `frontend/src/components/[x].tsx` | [component name] | ui-spec.md § [section] |
 | `frontend/src/app/[route]/page.tsx` | [page name] | ui-spec.md § [route] |
 
-## Frontend: Component Tree
-
-[Exact tree from ui-spec.md component inventory, annotated with:
-- server component vs client component (client only if interactive)
-- which API functions each component calls
-- what props it receives]
-
+**Frontend component tree** (this slice only):
 ```
-BoardPage (server — fetches briefs on load)
-  └── BriefBoard (client — owns board state)
-        └── BriefCard (client — card interactions)
-              ├── PriorityBadge (server — no interactivity)
-              └── AssignmentBadge (client — approve/reject)
+[Page] (server — fetches on load)
+  └── [Component] (client — interactive)
 ```
+
+**Contract endpoints covered**: [list which endpoints from api-contract.yaml]
+
+### Slice 2: [name — e.g. "Filtering"]
+[same structure as Slice 1]
+
+### Slice N: [name]
+[same structure]
+
+## Slice Dependency Order
+
+[Which slices must be built before which. A simple list or DAG.]
+1. Slice 1 (no dependencies — foundational)
+2. Slice 2 (depends on Slice 1 — uses [what])
+3. Slice N (depends on [what])
 
 ## Decisions Made
 

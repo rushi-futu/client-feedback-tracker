@@ -28,7 +28,7 @@
 #   → [plan-gate]      PM + Eng: "is this the right API surface?"
 #   → plan-impl        architect phase 2 → implementation-plan.md
 #   → [impl-gate]      Eng: "build it this way"
-#   → build (parallel) backend + frontend
+#   → build            slice-by-slice (backend → frontend per slice)
 #   → test             adversarial suite
 #   → [test-gate]      Eng: "which findings block merge?"
 #   → review           DoD + contract + plan compliance
@@ -343,16 +343,17 @@ jobs:
     if: always() && needs.plan-impl.result == 'success'
     environment: impl-gate
     steps:
-      - run: echo "Implementation plan approved. Starting parallel build."
+      - run: echo "Implementation plan approved. Starting slice-by-slice build."
 
 
-  # ── Step 4: Build — parallel ─────────────────────────────────────────────────
-  # Both agents read tasks/implementation-plan.md as primary source of truth.
-  # Shared Types section is the coordination point — both implement the same
-  # types independently. They cannot diverge because types are written out.
-  # Frontend also reads design/ui-spec.md as layout reference — not for code.
-  build-backend:
-    name: "Build: backend"
+  # ── Step 4: Build — vertical slices ──────────────────────────────────────────
+  # Single job that builds feature slice-by-slice: backend then frontend per slice.
+  # The implementation plan defines delivery slices in dependency order.
+  # For each slice: backend agent builds API/service, then frontend agent builds
+  # the UI that uses it. Frontend can read the backend code just written.
+  # This eliminates git race conditions and gives frontend real code to reference.
+  build:
+    name: "Build: vertical slices"
     needs: [bootstrap, impl-gate]
     runs-on: ubuntu-latest
     if: always() && needs.impl-gate.result == 'success'
@@ -368,90 +369,100 @@ jobs:
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Run backend agent
+      - name: Extract slice count from plan
+        id: slices
         run: |
-          AGENT=$(cat .claude/agents/backend.md)
-          claude \
-            --system-prompt "$AGENT" \
-            --dangerously-skip-permissions \
-            -p "
-          Read in this order before writing any code:
-          1. tasks/implementation-plan.md — primary source of truth
-          2. api-contract.yaml — confirm APPROVED
-          3. .claude/skills/codebase/api-patterns.md
-          4. .claude/skills/codebase/data-patterns.md
-          5. tasks/current-feature.md — mark backend tasks done as you go
+          COUNT=$(grep -c '^### Slice [0-9]' tasks/implementation-plan.md 2>/dev/null || echo "1")
+          echo "count=${COUNT}" >> $GITHUB_OUTPUT
+          echo "Found ${COUNT} delivery slice(s)"
 
-          Build the complete backend implementation.
-          Implement exactly what the plan describes — no more, no less.
-          All code in backend/.
-          Output your Done Signal when complete.
-          "
-
-      - name: Commit backend
+      - name: Configure git
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
-          git add backend/ tasks/ escalation/
-          git diff --staged --quiet || \
-            git commit -m "build(backend): implement per approved plan [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
 
-  build-frontend:
-    name: "Build: frontend"
-    needs: [bootstrap, impl-gate]
-    runs-on: ubuntu-latest
-    if: always() && needs.impl-gate.result == 'success'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.bootstrap.outputs.branch }}
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install Claude Code
-        run: npm install -g @anthropic-ai/claude-code
-
-      - name: Run frontend agent
+      - name: Build all slices
         run: |
-          AGENT=$(cat .claude/agents/frontend.md)
-          claude \
-            --system-prompt "$AGENT" \
-            --dangerously-skip-permissions \
-            -p "
-          Read in this order before writing any code:
-          1. tasks/implementation-plan.md — primary source of truth
-          2. design/ui-spec.md — layout and interaction reference (do not copy code)
-          3. api-contract.yaml — confirm APPROVED
-          4. .claude/skills/codebase/frontend-patterns.md
-          5. .claude/skills/codebase/architecture.md
-          6. tasks/current-feature.md — mark frontend tasks done as you go
+          BE_AGENT=$(cat .claude/agents/backend.md)
+          FE_AGENT=$(cat .claude/agents/frontend.md)
+          SLICE_COUNT=${{ steps.slices.outputs.count }}
 
-          Build the complete frontend implementation from scratch.
-          Use the ui-spec for what to build and how it should look.
-          Use the patterns for how to build it.
-          All code in frontend/.
-          Output your Done Signal when complete.
-          "
+          for i in $(seq 1 $SLICE_COUNT); do
+            echo "========================================="
+            echo "  SLICE ${i}/${SLICE_COUNT} — Backend"
+            echo "========================================="
 
-      - name: Commit frontend
-        run: |
-          git config user.name "claude-code[bot]"
-          git config user.email "claude-code[bot]@users.noreply.github.com"
-          git add frontend/ tasks/ escalation/
-          git diff --staged --quiet || \
-            git commit -m "build(frontend): implement per approved plan [skip ci]"
-          git push origin "${{ needs.bootstrap.outputs.branch }}"
+            claude \
+              --system-prompt "$BE_AGENT" \
+              --dangerously-skip-permissions \
+              -p "
+            You are building **Slice ${i}** (of ${SLICE_COUNT}).
+
+            Read in this order before writing any code:
+            1. tasks/implementation-plan.md — find 'Slice ${i}' in Delivery Slices
+            2. api-contract.yaml — confirm APPROVED
+            3. .claude/skills/codebase/api-patterns.md
+            4. .claude/skills/codebase/data-patterns.md
+            5. tasks/current-feature.md — mark backend tasks done as you go
+
+            Build ONLY the backend scope for Slice ${i}.
+            Implement exactly what the plan describes for this slice — no more, no less.
+            All code in backend/.
+            Output your Done Signal when complete.
+            "
+
+            # Commit backend slice
+            git add backend/ tasks/ escalation/
+            git diff --staged --quiet || \
+              git commit -m "build(backend): slice ${i}/${SLICE_COUNT} [skip ci]"
+
+            echo "========================================="
+            echo "  SLICE ${i}/${SLICE_COUNT} — Frontend"
+            echo "========================================="
+
+            claude \
+              --system-prompt "$FE_AGENT" \
+              --dangerously-skip-permissions \
+              -p "
+            You are building **Slice ${i}** (of ${SLICE_COUNT}).
+
+            Read in this order before writing any code:
+            1. tasks/implementation-plan.md — find 'Slice ${i}' in Delivery Slices
+            2. design/ui-spec.md — layout and interaction reference (do not copy code)
+            3. Read the backend code just written for this slice:
+               - backend/app/schemas/ — actual Pydantic schemas
+               - backend/app/routers/ — actual endpoints and query params
+            4. api-contract.yaml — confirm APPROVED
+            5. .claude/skills/codebase/frontend-patterns.md
+            6. .claude/skills/codebase/architecture.md
+            7. tasks/current-feature.md — mark frontend tasks done as you go
+
+            Build ONLY the frontend scope for Slice ${i}.
+            The backend for this slice is already built — read it.
+            Use the ui-spec for what to build and how it should look.
+            Use the patterns for how to build it.
+            All code in frontend/.
+            Output your Done Signal when complete.
+            "
+
+            # Commit frontend slice
+            git add frontend/ tasks/ escalation/
+            git diff --staged --quiet || \
+              git commit -m "build(frontend): slice ${i}/${SLICE_COUNT} [skip ci]"
+
+            echo "Slice ${i}/${SLICE_COUNT} complete."
+          done
+
+      - name: Push all commits
+        run: git push origin "${{ needs.bootstrap.outputs.branch }}"
 
 
   # ── Step 5: Test ──────────────────────────────────────────────────────────────
   test:
     name: "Test: adversarial suite"
-    needs: [bootstrap, build-backend, build-frontend]
+    needs: [bootstrap, build]
     runs-on: ubuntu-latest
-    if: always() && needs.build-backend.result == 'success' && needs.build-frontend.result == 'success'
+    if: always() && needs.build.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:

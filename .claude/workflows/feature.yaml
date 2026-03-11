@@ -76,14 +76,18 @@ steps:
         This is the last checkpoint before code is written.
 
   - id: build
-    name: "Feature team: build"
-    agent: feature-build-team
+    name: "Build: vertical slices"
+    agents: [backend, frontend]
     depends_on: plan-impl
-    parallel: true
+    strategy: slice
     prompt: |
-      Implementation plan is approved. Build the full feature.
+      Implementation plan is approved. Build slice-by-slice.
+      For each slice in the Delivery Slices section of the plan:
+        1. Backend agent builds the API/service scope for the slice
+        2. Frontend agent builds the UI scope, reading the backend code just written
+      Each slice gets its own commit pair (backend + frontend).
       Backend: follow api-patterns.md and data-patterns.md.
-      Frontend: follow frontend-patterns.md, use ui-spec as layout reference only.
+      Frontend: follow frontend-patterns.md, read backend code, use ui-spec as layout reference.
       Both: read implementation-plan.md as primary source of truth.
     outputs:
       - backend/**
