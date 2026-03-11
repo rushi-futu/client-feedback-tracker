@@ -3,7 +3,7 @@
 # Quality gates: typecheck, lint, tests.
 # Pattern detection: flags patterns worth promoting.
 
-set -euo pipefail
+set -uo pipefail
 
 echo "🪝 Post-task"
 EXIT_CODE=0
