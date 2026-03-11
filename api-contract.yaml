@@ -1,0 +1,120 @@
+# API Contract — Client Feedback Tracker
+# =========================================================
+# This is the single source of truth for the backend/frontend interface.
+# Every endpoint here maps to a component or interaction in design/ui-spec.md.
+# Build agents must not deviate from this contract.
+# =========================================================
+
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+
+endpoints:
+
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackListPage → FeedbackTable — loads all feedback items, sorted by created_at descending (newest first)"
+    query_params: []
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    request:
+      body:
+        client_name: string          # required
+        summary: string              # required
+        detail: string | null        # optional
+        theme: FeedbackTheme         # required — enum
+        status: FeedbackStatus       # required — enum, default: open
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Feeds FeedbackDetailPage → FeedbackForm (edit mode) on /feedback/[id] — pre-populates form fields"
+    path_params:
+      id: uuid
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) Save Changes submission on /feedback/[id] — partial update, all fields optional"
+    path_params:
+      id: uuid
+    request:
+      body:
+        client_name: string | null   # optional
+        summary: string | null       # optional
+        detail: string | null        # optional
+        theme: FeedbackTheme | null  # optional
+        status: FeedbackStatus | null  # optional — this is how items are marked actioned
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Handles delete button on FeedbackDetailPage — browser confirmation dialog happens client-side before this is called"
+    path_params:
+      id: uuid
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+schemas:
+
+  FeedbackTheme:
+    type: enum
+    values:
+      - UX
+      - Performance
+      - Support
+      - Pricing
+      - Communication
+
+  FeedbackStatus:
+    type: enum
+    values:
+      - open
+      - in_progress
+      - actioned
+
+  FeedbackItemRead:
+    fields:
+      id: uuid
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: FeedbackTheme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required:
+      - id
+      - client_name
+      - summary
+      - theme
+      - status
+      - created_at
+      - updated_at
+    notes:
+      - "detail is nullable — omitted from response only if null, never omitted entirely"
+      - "id is a UUID string, not an integer — different from existing Brief/Reporter models"
+      - "created_at and updated_at are ISO-8601 datetime strings with timezone"
