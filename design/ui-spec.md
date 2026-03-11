@@ -1,6 +1,6 @@
 # UI Spec — Client Feedback Tracker
 
-**Status:** PENDING_PM_APPROVAL
+**Status:** APPROVED
 **Written by:** PM (intent-only mode — no prototype provided)
 **Date:** 2026-03-11
 
