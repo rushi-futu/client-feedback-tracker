@@ -1,6 +1,6 @@
 # API Contract — Client Feedback Tracker
 # Created: 2026-03-11
-# Status: PENDING_APPROVAL
+# Status: APPROVED
 # UI source: design/ui-spec.md (APPROVED 2026-03-11)
 #
 # Every endpoint below maps directly to a component or interaction documented
@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Feature: Client Feedback CRUD
 # Added: 2026-03-11
-# Status: PENDING_APPROVAL
+# Status: APPROVED
 # UI source: design/ui-spec.md
 # ─────────────────────────────────────────────────────────────────────────────
 
