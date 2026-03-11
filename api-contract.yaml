@@ -1,0 +1,127 @@
+# API Contract — Client Feedback Tracker
+# Maintained by: architect agent
+# Source of truth for both backend and frontend agents
+
+# ────────────────────────────────────────────────────────────────────
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md (APPROVED)
+# ────────────────────────────────────────────────────────────────────
+
+endpoints:
+
+  # ── LIST ALL FEEDBACK ──────────────────────────────────────────────
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackListPage — returns all feedback items for FeedbackTable. Filters are client-side so no query params needed."
+    ui_component: "FeedbackListPage > FeedbackTable"
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  # ── GET SINGLE FEEDBACK ────────────────────────────────────────────
+  - method: GET
+    path: /feedback/{feedback_id}
+    purpose: "Feeds FeedbackDetailPage — returns a single feedback item for pre-populating FeedbackForm in edit mode."
+    ui_component: "FeedbackDetailPage > FeedbackForm (edit mode)"
+    params:
+      feedback_id: integer
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback not found" }
+
+  # ── CREATE FEEDBACK ────────────────────────────────────────────────
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm submission in create mode on /feedback/new."
+    ui_component: "NewFeedbackPage > FeedbackForm (create mode)"
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }  # Pydantic validation errors
+
+  # ── UPDATE FEEDBACK ────────────────────────────────────────────────
+  - method: PATCH
+    path: /feedback/{feedback_id}
+    purpose: "Handles FeedbackForm submission in edit mode on /feedback/[id]. Used for updating any field including status changes."
+    ui_component: "FeedbackDetailPage > FeedbackForm (edit mode)"
+    params:
+      feedback_id: integer
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback not found" }
+      422:
+        body: { detail: string }
+
+  # ── DELETE FEEDBACK ────────────────────────────────────────────────
+  - method: DELETE
+    path: /feedback/{feedback_id}
+    purpose: "Handles delete button on FeedbackDetailPage. Triggered after browser confirm dialog."
+    ui_component: "FeedbackDetailPage — delete button"
+    params:
+      feedback_id: integer
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: "Feedback not found" }
+
+# ────────────────────────────────────────────────────────────────────
+# SCHEMAS
+# ────────────────────────────────────────────────────────────────────
+
+schemas:
+
+  # ── Enums ──────────────────────────────────────────────────────────
+  Theme:
+    type: enum
+    values: ["UX", "Performance", "Support", "Pricing", "Communication"]
+
+  FeedbackStatus:
+    type: enum
+    values: ["open", "in_progress", "actioned"]
+
+  # ── Request Schemas ────────────────────────────────────────────────
+  FeedbackCreate:
+    purpose: "Create mode form submission from /feedback/new"
+    fields:
+      client_name: string        # required — free text
+      summary: string            # required — short description
+      detail: string | null      # optional — longer description
+      theme: Theme               # required — select dropdown
+      status: FeedbackStatus     # required — defaults to "open" in UI
+    required: [client_name, summary, theme, status]
+
+  FeedbackUpdate:
+    purpose: "Edit mode form submission from /feedback/[id]"
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: FeedbackStatus | null
+    required: []                 # all optional — PATCH semantics
+
+  # ── Response Schema ────────────────────────────────────────────────
+  FeedbackRead:
+    purpose: "Response shape for all feedback endpoints. Maps to FeedbackTable rows and FeedbackForm pre-population."
+    fields:
+      id: integer
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: FeedbackStatus
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, created_at, updated_at]
