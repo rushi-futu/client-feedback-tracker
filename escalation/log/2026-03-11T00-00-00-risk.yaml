@@ -1,0 +1,135 @@
+id: "2026-03-11T00-00-00-risk"
+timestamp: "2026-03-11T00:00:00Z"
+type: risk
+raised_by: ["backend_teammate"]
+status: open
+
+description: |
+  The implementation plan (tasks/implementation-plan.md) requires updating
+  backend/alembic/env.py to add the line:
+    from app.models import feedback_item  # noqa: F401
+  so that alembic autogenerate can detect the new FeedbackItem model and
+  generate the create_feedback_items_table migration.
+
+  A pre-tool boundary hook has classified backend/alembic/env.py as a
+  protected file and blocked the write. The change is a single import line
+  addition with no other modifications — it is required by the approved
+  implementation plan.
+
+  Without this change:
+  - alembic autogenerate will not see the FeedbackItem model
+  - The migration cannot be generated
+  - The database table will not be created
+  - All five backend endpoints will fail at runtime (table missing)
+
+options:
+  - id: A
+    label: "Approve the env.py change as specified in the implementation plan"
+    description: |
+      Allow the backend agent to write the following single line to alembic/env.py:
+        from app.models import feedback_item  # noqa: F401
+      immediately after the existing Base import line. This is verbatim from the
+      approved implementation plan section 'Backend: Files to Create'.
+    implication: "Unblocks migration generation. Low risk — single import addition."
+    agent_preference: true
+
+  - id: B
+    label: "Reject and provide an alternative approach"
+    description: |
+      Human provides an alternative mechanism to register the model with alembic
+      (e.g., a different file location, or manual migration script).
+    implication: "Requires re-planning. Delays backend completion."
+    agent_preference: false
+
+agent_default:
+  choice: A
+  reasoning: >
+    The change is a single import line, exactly as specified in the approved
+    implementation plan. This is the standard alembic pattern per
+    .claude/skills/codebase/data-patterns.md. The risk is minimal.
+
+blast_radius: high
+blast_reasoning: >
+  alembic/env.py is infrastructure-level — a mistake here could affect all
+  future migrations. However, the requested change is additive only (one import
+  line) and is explicitly specified in the approved plan.
+
+waiting_on: tech_lead
+
+context_files:
+  - "tasks/implementation-plan.md"
+  - "backend/alembic/env.py"
+  - ".claude/skills/codebase/data-patterns.md"
+
+root_cause_analysis: |
+  The block appears to be a regex false positive. The pre-tool-boundary.sh hook
+  converts glob patterns to regexes with:
+    sed 's/\*\*/.*/' | sed 's/\*/[^\/]*/'
+  The pattern "*.env.*" is converted to "[^\/]*.env.*" (only the first * is replaced,
+  the second * after .env remains as a literal regex wildcard).
+  In regex, "." matches any character, so ".env" matches any character followed by "env".
+  The path "backend/alembic/env.py" contains "/env" which matches ".env" (the "/" matches
+  "." and "env" matches "env"). This triggers the "*.env.*" rule which was intended to
+  protect secrets files like ".env.production", not alembic configuration.
+  The backend/alembic/env.py file is NOT a secrets file.
+
+notes: |
+  All other backend tasks (BE-02 through BE-05) are complete:
+    - backend/app/schemas/feedback_item.py   ✅ created
+    - backend/app/models/feedback_item.py    ✅ created
+    - backend/app/routers/feedback_items.py  ✅ created
+    - backend/app/main.py                    ✅ created
+    - backend/alembic.ini                    ✅ created
+    - backend/alembic/script.py.mako         ✅ created
+
+  Only BE-01 (migration) is blocked, pending this escalation resolution.
+  Once alembic/env.py is approved and created, the migration can be generated with:
+    cd backend && alembic revision --autogenerate -m "create_feedback_items_table" && alembic upgrade head
+
+  Full intended content for backend/alembic/env.py is:
+
+    import os
+    import sys
+    from logging.config import fileConfig
+    from sqlalchemy import engine_from_config
+    from sqlalchemy import pool
+    from alembic import context
+
+    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+    config = context.config
+
+    if config.config_file_name is not None:
+        fileConfig(config.config_file_name)
+
+    from app.database import Base
+    from app.models import feedback_item  # noqa: F401
+
+    target_metadata = Base.metadata
+
+    def run_migrations_offline() -> None:
+        url = config.get_main_option("sqlalchemy.url")
+        context.configure(
+            url=url,
+            target_metadata=target_metadata,
+            literal_binds=True,
+            dialect_opts={"paramstyle": "named"},
+        )
+        with context.begin_transaction():
+            context.run_migrations()
+
+    def run_migrations_online() -> None:
+        connectable = engine_from_config(
+            config.get_section(config.config_ini_section, {}),
+            prefix="sqlalchemy.",
+            poolclass=pool.NullPool,
+        )
+        with connectable.connect() as connection:
+            context.configure(connection=connection, target_metadata=target_metadata)
+            with context.begin_transaction():
+                context.run_migrations()
+
+    if context.is_offline_mode():
+        run_migrations_offline()
+    else:
+        run_migrations_online()

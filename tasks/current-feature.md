@@ -14,11 +14,14 @@ Created: 2026-03-11
       status (SAEnum FeedbackStatus, not null, default 'open'),
       created_at (timestamptz, server default), updated_at (timestamptz, server default + onupdate)
       Run via: `alembic revision --autogenerate -m "create feedback_items table"`
+      ⚠️  BLOCKED — escalation/log/2026-03-11T00-00-00-risk.yaml raised.
+      alembic/env.py cannot be written due to boundary hook false positive.
+      Awaiting tech_lead resolution.
 
-- [ ] BE-02: Model — `backend/app/models/feedback_item.py`
+- [x] BE-02: Model — `backend/app/models/feedback_item.py`
       SQLAlchemy model for the feedback_items table. Enums imported from schemas.
 
-- [ ] BE-03: Schemas — `backend/app/schemas/feedback_item.py`
+- [x] BE-03: Schemas — `backend/app/schemas/feedback_item.py`
       Three Pydantic schema classes:
       - FeedbackTheme (str Enum): ux, performance, support, pricing, communication
       - FeedbackStatus (str Enum): open, in_progress, actioned
@@ -27,7 +30,7 @@ Created: 2026-03-11
       - FeedbackItemRead: all fields including id (UUID), created_at, updated_at; model_config from_attributes=True
       Validation rule: FeedbackItemUpdate must reject null client_name or null summary (use @field_validator).
 
-- [ ] BE-04: Router — `backend/app/routers/feedback_items.py`
+- [x] BE-04: Router — `backend/app/routers/feedback_items.py`
       prefix="/feedback", tags=["feedback"]
       Five endpoints per api-contract.yaml:
       GET /          → list all, ordered by created_at DESC
@@ -36,7 +39,7 @@ Created: 2026-03-11
       PATCH /{id}    → partial update, 404 if missing
       DELETE /{id}   → delete, 204, 404 if missing
 
-- [ ] BE-05: Register router — `backend/app/main.py`
+- [x] BE-05: Register router — `backend/app/main.py`
       Include feedback_items.router. Update app title if needed.
 
 ---
