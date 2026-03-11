@@ -172,7 +172,7 @@ jobs:
     needs: [bootstrap, pm-gate]
     runs-on: ubuntu-latest
     # Run after pm-gate if prototype was provided, otherwise after bootstrap
-    if: always() && (needs.pm-gate.result == 'success' || needs.bootstrap.outputs.has_prototype == 'false')
+    if: always() && (needs.pm-gate.result == 'success' || needs.pm-gate.result == 'skipped')
     steps:
       - uses: actions/checkout@v4
         with:
