@@ -1,0 +1,190 @@
+# API Contract — Client Feedback Tracker
+# Created: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md (APPROVED 2026-03-11)
+#
+# Every endpoint below maps directly to a component or interaction documented
+# in design/ui-spec.md. No endpoint exists here that the UI does not need.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Feature: Client Feedback CRUD
+# Added: 2026-03-11
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md
+# ─────────────────────────────────────────────────────────────────────────────
+
+endpoints:
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackListPage — loads all feedback items on page mount.
+      Sorted server-side by created_at descending (newest first) to match
+      FeedbackTable column sort spec. Filters are applied client-side per
+      ui-spec (no query params needed).
+    response:
+      200:
+        body: list[FeedbackItemRead]
+
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm submission on /feedback/new (create mode).
+      Returns the created item so the frontend can confirm success before
+      redirecting to /feedback.
+    request:
+      body:
+        client_name: string          # required — free text, maps to "Client name" field
+        summary: string              # required — maps to "Summary" field
+        detail: string | null        # optional — maps to "Detail" textarea
+        theme: "ux|performance|support|pricing|communication"  # required
+        status: "open|in_progress|actioned"                    # optional, default: open
+    response:
+      201:
+        body: FeedbackItemRead
+      422:
+        body: { detail: string }     # Pydantic validation failure
+
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Feeds FeedbackDetailPage — pre-populates FeedbackForm in edit mode.
+      Called on mount of /feedback/[id].
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm submission on /feedback/[id] (edit mode).
+      All fields are optional — only changed fields need to be sent.
+      Covers status changes (open → in_progress → actioned) which can only
+      be made from this page per ui-spec.
+    request:
+      body:
+        client_name: string | null   # optional
+        summary: string | null       # optional
+        detail: string | null        # optional
+        theme: "ux|performance|support|pricing|communication" | null  # optional
+        status: "open|in_progress|actioned" | null                    # optional
+    response:
+      200:
+        body: FeedbackItemRead
+      404:
+        body: { detail: string }
+      422:
+        body: { detail: string }
+
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles Delete button on FeedbackDetailPage (/feedback/[id]).
+      UI confirms with browser dialog before calling. Returns 204 No Content
+      on success; frontend redirects to /feedback.
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: string }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Schemas
+# ─────────────────────────────────────────────────────────────────────────────
+
+schemas:
+  ThemeEnum:
+    description: "Fixed taxonomy of feedback themes — not user-managed"
+    values:
+      - ux
+      - performance
+      - support
+      - pricing
+      - communication
+
+  StatusEnum:
+    description: "Lifecycle state of a feedback item"
+    values:
+      - open          # default on create
+      - in_progress   # actioned but not complete
+      - actioned      # fully addressed
+
+  FeedbackItemRead:
+    description: "Full representation of a feedback item — returned by all endpoints"
+    fields:
+      id:           { type: uuid,     notes: "System-generated on create" }
+      client_name:  { type: string,   notes: "Free text, required" }
+      summary:      { type: string,   notes: "Short description, required" }
+      detail:       { type: "string | null", notes: "Optional longer description" }
+      theme:        { type: ThemeEnum }
+      status:       { type: StatusEnum }
+      created_at:   { type: datetime, notes: "Set on create, timezone-aware" }
+      updated_at:   { type: datetime, notes: "Updated on every PATCH, timezone-aware" }
+    required:
+      - id
+      - client_name
+      - summary
+      - theme
+      - status
+      - created_at
+      - updated_at
+
+  FeedbackItemCreate:
+    description: "Payload for POST /feedback/ — FeedbackForm create mode submission"
+    fields:
+      client_name:  { type: string,   notes: "Required — validated client-side and server-side" }
+      summary:      { type: string,   notes: "Required" }
+      detail:       { type: "string | null", notes: "Optional" }
+      theme:        { type: ThemeEnum,        notes: "Required" }
+      status:       { type: StatusEnum,       notes: "Optional, defaults to open" }
+    required:
+      - client_name
+      - summary
+      - theme
+
+  FeedbackItemUpdate:
+    description: "Payload for PATCH /feedback/{id} — FeedbackForm edit mode submission"
+    fields:
+      client_name:  { type: "string | null",   notes: "Optional — omit to leave unchanged" }
+      summary:      { type: "string | null",   notes: "Optional" }
+      detail:       { type: "string | null",   notes: "Optional — send null to clear" }
+      theme:        { type: "ThemeEnum | null",notes: "Optional" }
+      status:       { type: "StatusEnum | null", notes: "Optional — this is how status changes are made" }
+    required: []    # all fields optional per PATCH semantics
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Assumptions made (not explicit in ui-spec — flagged for PM/Eng review)
+# ─────────────────────────────────────────────────────────────────────────────
+
+assumptions:
+  - id: A1
+    decision: "UUID primary key for feedback items"
+    reasoning: >
+      ui-spec.md explicitly specifies id: uuid. Consistent with best practice for
+      client-facing APIs. The existing architecture patterns use integer PKs for
+      internal entities — this is an intentional deviation matching the spec.
+    default_if_not_challenged: "Use UUID"
+
+  - id: A2
+    decision: "Server-side sort by created_at DESC — no sort params on GET /feedback/"
+    reasoning: >
+      ui-spec specifies 'rows sorted by date logged descending (newest first)'.
+      No mention of sort controls in the UI. Sorting server-side is simpler and
+      ensures consistency even when filters reduce the result set.
+    default_if_not_challenged: "Sort server-side, no sort query params"
+
+  - id: A3
+    decision: "No query params on GET /feedback/ — all filtering client-side"
+    reasoning: >
+      ui-spec explicitly states: 'Filters on /feedback are client-side — no round
+      trip needed if all items loaded'. This means the list endpoint always returns
+      all items and filtering logic lives in the frontend FilterBar component.
+    default_if_not_challenged: "No filter query params on list endpoint"
+
+  - id: A4
+    decision: "status defaults to 'open' on create if not supplied"
+    reasoning: >
+      ui-spec says status field has 'default: open'. FeedbackForm pre-selects open.
+      API should also default to open if the field is omitted from the POST body.
+    default_if_not_challenged: "Default status = open"
