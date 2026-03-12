@@ -104,87 +104,41 @@ echo ""
 # PHASE 1: VISUAL — Read prototype → ui-spec
 # ═══════════════════════════════════════════════════════════════
 
-if [ -n "$PROTOTYPE_URL" ]; then
-  phase "1/9: VISUAL — Read prototype"
+phase "1/9: VISUAL — Read prototype"
 
-  SOURCE_PROMPT=""
-  if [[ "$PROTOTYPE_URL" == *figma.com* ]]; then
-    echo "Input: Figma URL (will use Figma MCP)"
-    SOURCE_PROMPT="Figma design URL: ${PROTOTYPE_URL}
-
-Use the Figma MCP tools to read this design directly.
-Fetch the frame or page — read layout, components, text content, tokens, variants.
-Text content reveals data fields the UI displays.
-Component variants reveal different states (empty, loading, error, active).
-Auto-layout properties reveal spacing and responsive behaviour.
-This is structured data — much richer than screenshots."
-  elif [[ "$PROTOTYPE_URL" == http* ]]; then
-    echo "Input: URL (will try web fetch)"
-    SOURCE_PROMPT="Prototype URL: ${PROTOTYPE_URL}
-Try to web fetch this URL. If it returns useful content, use it.
-If the page is mostly empty JS scaffolding, say so."
-  fi
-
-  # Check for supplementary local files
-  SCREENSHOTS=$(find design/prototype/screenshots -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.webp" \) 2>/dev/null | sort || true)
-  CODE_FILES=$(find design/prototype/code -type f \( -name "*.tsx" -o -name "*.jsx" -o -name "*.ts" \) 2>/dev/null | sort || true)
-
-  if [ -n "$SCREENSHOTS" ]; then
-    COUNT=$(echo "$SCREENSHOTS" | wc -l | tr -d ' ')
-    SOURCE_PROMPT="${SOURCE_PROMPT}
-
-Also found ${COUNT} screenshot(s) — read as supplementary visual reference:
-$(echo "$SCREENSHOTS" | sed 's/^/  - /')"
-  fi
-
-  if [ -n "$CODE_FILES" ]; then
-    COUNT=$(echo "$CODE_FILES" | wc -l | tr -d ' ')
-    SOURCE_PROMPT="${SOURCE_PROMPT}
-
-Also found ${COUNT} exported code file(s) — read for component hierarchy reference:
-$(echo "$CODE_FILES" | sed 's/^/  - /')
-DO NOT copy this code. Read it as a design reference only."
-  fi
-
-  AGENT=$(cat .claude/agents/visual.md)
-  run_claude --system-prompt "$AGENT" "
-Read the PM prototype and produce design/ui-spec.md.
-
-${SOURCE_PROMPT}
-
-Follow your output format exactly.
-Output your Done Signal when complete.
-"
-
-  [ -f "design/ui-spec.md" ] || fail "ui-spec.md was not created"
-  ok "ui-spec.md written"
-
-  # ── Gate 1: PM approval ──
-  gate "PM: review ui-spec.md"
+# Check if an approved ui-spec already exists
+SKIP_VISUAL=false
+if [ -f "design/ui-spec.md" ] && grep -q "APPROVED" design/ui-spec.md; then
+  echo "  Found existing APPROVED design/ui-spec.md"
   echo ""
-  echo "  Review design/ui-spec.md for:"
-  echo "    - Layout understood correctly?"
-  echo "    - Data shapes right?"
-  echo "    - Interactions complete?"
-  echo "    - Answer any flagged ambiguities"
+  echo "  Options:"
+  echo "    k) Keep it — skip visual phase, use existing spec"
+  echo "    r) Re-read — read the prototype again and overwrite"
   echo ""
-  read -p "Approve? (y to approve, n to edit manually first): " APPROVE
-  if [[ "$APPROVE" == "y" ]]; then
-    sed -i '' 's/Status: PENDING_PM_APPROVAL/Status: APPROVED/' design/ui-spec.md
-    ok "UI spec approved"
-  else
-    echo "Edit design/ui-spec.md, then change Status to APPROVED and press Enter to continue."
-    read -p "Press Enter when ready... "
-    grep -q "APPROVED" design/ui-spec.md || fail "ui-spec.md not marked APPROVED"
-    ok "UI spec approved (manually edited)"
+  read -p "Choice (k/r): " SPEC_CHOICE
+  if [[ "$SPEC_CHOICE" != "r" ]]; then
+    SKIP_VISUAL=true
+    ok "Using existing approved ui-spec.md"
   fi
-else
-  phase "1/9: VISUAL — Skipped (no prototype URL)"
-  if [ -f "design/ui-spec.md" ] && grep -q "APPROVED" design/ui-spec.md; then
-    ok "Existing approved ui-spec.md found"
-  else
-    echo "No prototype and no approved ui-spec.md — running in intent-only mode"
+fi
+
+if [ "$SKIP_VISUAL" = false ] && [ -n "$PROTOTYPE_URL" ]; then
+  # Delegate to run-visual.sh — it runs Claude interactively so MCP tools
+  # (including Figma) are available. It handles the PM approval gate too.
+  ./run-visual.sh "$PROTOTYPE_URL"
+
+  # Verify it produced an approved spec
+  if [ ! -f "design/ui-spec.md" ]; then
+    fail "Visual step did not produce design/ui-spec.md"
   fi
+  if ! grep -q "APPROVED" design/ui-spec.md; then
+    fail "design/ui-spec.md exists but is not APPROVED"
+  fi
+  ok "Visual step complete — ui-spec approved"
+
+elif [ "$SKIP_VISUAL" = false ]; then
+  echo "No prototype URL provided and no existing ui-spec.md"
+  echo "Running in intent-only mode"
 fi
 
 # ═══════════════════════════════════════════════════════════════
