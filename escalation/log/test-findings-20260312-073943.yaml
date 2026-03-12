@@ -1,0 +1,203 @@
+# Test Findings — Client Feedback CRUD + Filtering
+# Agent: tester
+# Date: 2026-03-12T07:39:43
+# Feature: tasks/implementation-plan.md — Slice 1 + Slice 2
+# Contract: api-contract.yaml (APPROVED)
+
+summary:
+  total_tests: 81
+  passed: 76
+  failed: 5
+  test_files:
+    - app/backend/tests/conftest.py
+    - app/backend/tests/test_feedback.py
+    - app/backend/tests/test_contracts.py
+  coverage:
+    unit: "N/A — no service layer, CRUD logic inline in router"
+    integration: "5/5 endpoints"
+    contract: "5/5 endpoints"
+
+# ═══════════════════════════════════════════════════════════════════
+# BUGS — confirmed by failing tests
+# ═══════════════════════════════════════════════════════════════════
+
+bugs:
+
+  - id: BUG-001
+    severity: BLOCKER
+    title: "Empty string accepted for required field client_name on POST"
+    file: "app/backend/app/schemas/feedback.py"
+    line: 21
+    test: "tests/test_feedback.py::TestCreateFeedback::test_accepts_empty_string_client_name"
+    description: >
+      POST /feedback/ with client_name="" returns 201 instead of 422.
+      The Pydantic schema uses `client_name: str` which accepts empty strings.
+      The contract says client_name is required — semantically, an empty string
+      is not a valid client name.
+    impact: >
+      Users (or the frontend without JS) can create feedback items with blank
+      client names. These items are unfilterable by search and display as empty
+      cells in the FeedbackTable. Data integrity issue.
+    fix_hint: >
+      Add `min_length=1` to the Pydantic field: `client_name: str = Field(min_length=1)`.
+      Or use a custom validator with `.strip()` check.
+
+  - id: BUG-002
+    severity: BLOCKER
+    title: "Empty string accepted for required field summary on POST"
+    file: "app/backend/app/schemas/feedback.py"
+    line: 22
+    test: "tests/test_feedback.py::TestCreateFeedback::test_accepts_empty_string_summary"
+    description: >
+      POST /feedback/ with summary="" returns 201 instead of 422.
+      Same root cause as BUG-001 — Pydantic `str` type permits empty strings.
+    impact: >
+      Feedback items with blank summaries render as empty rows in the table.
+    fix_hint: >
+      Add `min_length=1` to the Pydantic field: `summary: str = Field(min_length=1)`.
+
+  - id: BUG-003
+    severity: WARNING
+    title: "Whitespace-only string accepted for client_name on POST"
+    file: "app/backend/app/schemas/feedback.py"
+    line: 21
+    test: "tests/test_feedback.py::TestCreateFeedback::test_accepts_whitespace_only_client_name"
+    description: >
+      POST /feedback/ with client_name="   " returns 201.
+      A string of only spaces is semantically empty.
+      The frontend trims before submit (formData.client_name.trim()),
+      so this is only exploitable via direct API calls.
+    impact: >
+      API-only clients can create items with whitespace-only names.
+      These appear blank in the UI and are hard to search for.
+    fix_hint: >
+      Use a Pydantic validator that strips whitespace then checks min_length.
+
+  - id: BUG-004
+    severity: WARNING
+    title: "List endpoint ordering not deterministic for same-second items"
+    file: "app/backend/app/routers/feedback.py"
+    line: 24
+    test: "tests/test_feedback.py::TestListFeedback::test_returns_items_ordered_by_date_logged_desc"
+    description: >
+      GET /feedback/ orders by date_logged DESC, but items created within the
+      same second (SQLite has second-level precision) have no deterministic
+      secondary sort. The test creates two items 100ms apart but they get the
+      same timestamp, resulting in arbitrary order.
+      In production (PostgreSQL with microsecond precision), this is less likely
+      but still possible for concurrent requests.
+    impact: >
+      UI list order is unpredictable when multiple items share the same timestamp.
+      Could confuse users who just created items and see them in unexpected order.
+    fix_hint: >
+      Add secondary sort: `.order_by(Feedback.date_logged.desc(), Feedback.id.desc())`
+      This guarantees newest-first even for same-timestamp items.
+
+  - id: BUG-005
+    severity: WARNING
+    title: "Empty string accepted for client_name on PATCH"
+    file: "app/backend/app/schemas/feedback.py"
+    line: 29
+    test: "tests/test_feedback.py::TestUpdateFeedback::test_update_with_empty_string_client_name"
+    description: >
+      PATCH /feedback/{id} with client_name="" returns 200.
+      Same root cause as BUG-001 applied to FeedbackUpdate schema.
+      When a field IS provided in a PATCH, it should still be validated.
+    impact: >
+      A valid feedback item's client_name can be blanked out via API.
+    fix_hint: >
+      Add `min_length=1` to FeedbackUpdate.client_name field.
+      Since it's Optional, use: `client_name: str | None = Field(None, min_length=1)`
+
+# ═══════════════════════════════════════════════════════════════════
+# WARNINGS — from code review (not caught by failing tests)
+# ═══════════════════════════════════════════════════════════════════
+
+warnings:
+
+  - id: WARN-001
+    title: "No max_length validation on Pydantic schemas"
+    file: "app/backend/app/schemas/feedback.py"
+    description: >
+      DB columns have varchar(255) for client_name and varchar(500) for summary,
+      but Pydantic schemas have no max_length constraint. SQLite doesn't enforce
+      varchar length (tests pass with 300+ char strings), but PostgreSQL will
+      either truncate or raise a DataError — resulting in a 500 instead of 422.
+    risk: "Medium — will surface in production (PostgreSQL) but not in tests (SQLite)"
+    fix_hint: >
+      Add max_length to Pydantic fields:
+      `client_name: str = Field(min_length=1, max_length=255)`
+      `summary: str = Field(min_length=1, max_length=500)`
+
+  - id: WARN-002
+    title: "Variable shadowing: 'status' param shadows fastapi.status module"
+    file: "app/backend/app/routers/feedback.py"
+    line: 14
+    description: >
+      The query parameter `status: Status | None` in list_feedback() shadows
+      the imported `status` module from `from fastapi import ... status`.
+      Currently safe because status constants are only used in decorators,
+      not inside function bodies. But adding any `status.HTTP_*` usage inside
+      the function would reference the query parameter instead.
+    risk: "Low — works now, fragile for future changes"
+    fix_hint: "Rename the query param to `status_filter` or alias the import."
+
+  - id: WARN-003
+    title: "updated_at onupdate=func.now() doesn't work in SQLite"
+    file: "app/backend/app/models/feedback.py"
+    line: 17
+    description: >
+      SQLAlchemy's `onupdate=func.now()` is a Python-side default that fires
+      on UPDATE. However, this relies on SQLAlchemy's event system correctly
+      and may not work identically with SQLite vs PostgreSQL. The test for
+      PATCH doesn't verify updated_at actually changed (it only checks
+      date_logged didn't change). This means updated_at regression in
+      production would not be caught by the current test suite.
+    risk: "Medium — updated_at may not update correctly, impacting audit trail"
+
+  - id: WARN-004
+    title: "No frontend test infrastructure"
+    description: >
+      package.json has no vitest, @testing-library/react, @testing-library/jest-dom,
+      or jsdom in devDependencies. Frontend components cannot be tested until
+      test infrastructure is added. The test-patterns.md specifies Vitest + Testing
+      Library as the frontend test stack.
+    risk: "High — zero frontend test coverage"
+    fix_hint: >
+      Add to devDependencies: vitest, @vitejs/plugin-react, @testing-library/react,
+      @testing-library/jest-dom, @testing-library/user-event, jsdom.
+      Create vitest.config.ts and src/tests/setup.ts per test-patterns.md.
+
+  - id: WARN-005
+    title: "Pydantic coerces integer to string for client_name"
+    file: "app/backend/app/schemas/feedback.py"
+    description: >
+      Sending client_name as integer (e.g. 12345) in JSON resulted in 422 rejection,
+      which is correct. However, this only works because Pydantic v2 in strict validation
+      mode (used by FastAPI) rejects non-string inputs. If Pydantic settings change to
+      lax mode, integers would be silently coerced to strings.
+    risk: "Low — currently correct, but fragile to Pydantic config changes"
+
+# ═══════════════════════════════════════════════════════════════════
+# ESCALATIONS
+# ═══════════════════════════════════════════════════════════════════
+
+escalations: "none"
+
+# ═══════════════════════════════════════════════════════════════════
+# DECISION NEEDED
+# ═══════════════════════════════════════════════════════════════════
+
+decisions_needed:
+  - question: >
+      BUG-001/002/003/005: Should empty/whitespace-only strings be rejected
+      at the API level? The frontend already trims and validates, so these
+      only affect direct API consumers. If the API is internal-only, this is
+      lower priority. If the API will be consumed by external clients, this
+      is a blocker.
+    default: "Add min_length=1 validation — defense in depth"
+
+  - question: >
+      BUG-004 (ordering): Should a secondary sort by id DESC be added?
+      This is cosmetic in most cases but ensures deterministic ordering.
+    default: "Yes — add .order_by(Feedback.date_logged.desc(), Feedback.id.desc())"

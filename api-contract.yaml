@@ -1,0 +1,159 @@
+# API Contract — Client Feedback Tracker
+# Maintained by: architect agent
+# Human-approved before any code is written
+
+# ─────────────────────────────────────────────────────────────────
+# Feature: Client Feedback CRUD + Filtering
+# Added: 2026-03-12
+# Status: APPROVED
+# UI source: design/ui-spec.md (APPROVED 2026-03-12)
+# ─────────────────────────────────────────────────────────────────
+
+endpoints:
+
+  # ── LIST FEEDBACK ─────────────────────────────────────────────
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackTable + FilterBar on Feedback List page (/feedback).
+      Supports optional query-param filtering by client name search,
+      theme, and status. Returns all items when no filters are applied.
+    query_params:
+      search:
+        type: string
+        required: false
+        description: "Case-insensitive substring match against client_name"
+      theme:
+        type: Theme
+        required: false
+        description: "Exact match filter on theme enum value"
+      status:
+        type: Status
+        required: false
+        description: "Exact match filter on status enum value"
+    response:
+      200:
+        body: list[FeedbackRead]
+        description: "Always returns 200, even if list is empty"
+
+  # ── GET SINGLE FEEDBACK ──────────────────────────────────────
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Pre-populates FeedbackForm (edit mode) on Edit Feedback page
+      (/feedback/:id). Also serves NotFoundState when ID is invalid.
+    path_params:
+      id:
+        type: integer
+        required: true
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+
+  # ── CREATE FEEDBACK ──────────────────────────────────────────
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission on Log Feedback
+      page (/feedback/new). Auto-sets id and date_logged.
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: "Pydantic validation error (automatic)"
+
+  # ── UPDATE FEEDBACK ──────────────────────────────────────────
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission — "Save Changes"
+      button on Edit Feedback page (/feedback/:id).
+    path_params:
+      id:
+        type: integer
+        required: true
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: "Pydantic validation error (automatic)"
+
+  # ── DELETE FEEDBACK ──────────────────────────────────────────
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles "Delete" button on Edit Feedback page (/feedback/:id).
+      Called after browser confirm() dialog confirms deletion.
+    path_params:
+      id:
+        type: integer
+        required: true
+    response:
+      204:
+        body: null
+        description: "No content — item deleted"
+      404:
+        body: { detail: "Feedback item not found" }
+
+# ─────────────────────────────────────────────────────────────────
+# SCHEMAS
+# ─────────────────────────────────────────────────────────────────
+
+schemas:
+
+  Theme:
+    type: enum
+    values: ["UX", "Performance", "Support", "Pricing", "Communication"]
+
+  Status:
+    type: enum
+    values: ["Open", "In Progress", "Actioned"]
+
+  FeedbackCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+    required: [client_name, summary, theme]
+    notes: >
+      status defaults to "Open" if not provided.
+      detail is optional (nullable).
+
+  FeedbackUpdate:
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: Status | null
+    required: []
+    notes: >
+      All fields optional — PATCH semantics.
+      Only provided fields are updated.
+
+  FeedbackRead:
+    fields:
+      id: integer
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+      date_logged: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, date_logged, updated_at]
+    notes: >
+      id is auto-generated integer PK.
+      date_logged is auto-set to creation timestamp (not editable).
+      updated_at is auto-set on every modification.
+      detail may be null if not provided on create.

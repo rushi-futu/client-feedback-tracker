@@ -1,0 +1,508 @@
+# Review Report — Client Feedback CRUD + Filtering
+# Date: 2026-03-12
+# Reviewer: AI Reviewer (claude-opus-4-5)
+# Feature: Client Feedback CRUD + Filtering (Slice 1 + Slice 2)
+# Contract: api-contract.yaml (APPROVED)
+# Implementation Plan: tasks/implementation-plan.md (APPROVED)
+# UI Spec: design/ui-spec.md (PM APPROVED)
+
+verdict: "⚠️ MERGE WITH CONDITIONS"
+
+# ═══════════════════════════════════════════════════════════════════
+# ESCALATION STATUS
+# ═══════════════════════════════════════════════════════════════════
+
+escalation_status:
+  open_escalations: 0
+  notes: >
+    No escalation files found besides the example template and the tester's
+    findings report. The tester's report explicitly states escalations: "none".
+    No agents raised contract conflicts or ambiguity escalations.
+
+# ═══════════════════════════════════════════════════════════════════
+# DEFINITION OF DONE CHECKLIST
+# ═══════════════════════════════════════════════════════════════════
+
+dod_checklist:
+
+  code_quality:
+    - item: "TypeScript tsc --noEmit passes with zero errors"
+      status: "UNCHECKED"
+      note: "No CI evidence. Frontend has no test/build pipeline configured."
+    - item: "Lint: eslint passes with zero warnings"
+      status: "UNCHECKED"
+      note: "eslint not configured in devDependencies — 'next lint' exists but no eslint config file found."
+    - item: "No console.log in production code"
+      status: "PASS"
+      note: "Grep confirms zero console.log in app/frontend/src/ and app/backend/app/"
+    - item: "No TODO or FIXME without a linked issue number"
+      status: "PASS"
+      note: "Grep confirms zero TODO/FIXME"
+    - item: "No functions over 30 lines"
+      status: "WARNING"
+      note: >
+        FeedbackForm component (app/frontend/src/components/forms/FeedbackForm.tsx)
+        spans ~298 lines as a single function. The handleSubmit function is ~25 lines (OK).
+        The component itself is large due to JSX. React components commonly exceed this,
+        but the DoD makes no exception. The form handlers (validateField, validateAll,
+        handleChange, handleBlur, handleDelete) are each well under 30 lines.
+        FeedbackListClient handleFiltersChange is fine (~20 lines).
+    - item: "No any types without explanatory comment"
+      status: "PASS"
+      note: "Grep confirms zero 'any' in TypeScript files"
+    - item: "No commented-out code"
+      status: "PASS"
+      note: "No commented-out code blocks found"
+
+  tests:
+    - item: "Unit tests written for all new business logic"
+      status: "PASS"
+      note: "81 tests across test_feedback.py and test_contracts.py. No service layer, so integration tests cover all business logic."
+    - item: "Integration tests for all new API endpoints"
+      status: "PASS"
+      note: "All 5 endpoints tested: POST, GET (single), GET (list), PATCH, DELETE"
+    - item: "All new tests pass"
+      status: "FAIL"
+      note: >
+        5 of 81 tests fail:
+        - test_accepts_empty_string_client_name (BUG-001 BLOCKER)
+        - test_accepts_empty_string_summary (BUG-002 BLOCKER)
+        - test_accepts_whitespace_only_client_name (BUG-003 WARNING)
+        - test_returns_items_ordered_by_date_logged_desc (BUG-004 WARNING)
+        - test_update_with_empty_string_client_name (BUG-005 WARNING)
+    - item: "No skipped tests without explanation"
+      status: "PASS"
+      note: "Grep confirms zero .skip / xit patterns"
+    - item: "At least one unhappy path tested per endpoint"
+      status: "PASS"
+      note: >
+        Comprehensive unhappy paths: 404s for all endpoints, 422 for invalid enum
+        values, empty body, wrong types, SQL injection, case sensitivity, double
+        delete, non-integer IDs, negative IDs, zero IDs.
+    - item: "Contract tests present — response shapes validated"
+      status: "PASS"
+      note: "test_contracts.py validates response shapes, field types, enum values, error shapes, and status codes for all endpoints."
+
+  api_contract:
+    - item: "All endpoints in api-contract.yaml are implemented"
+      status: "PASS"
+      note: >
+        All 5 endpoints implemented:
+        GET /feedback/ (list with filters) ✅
+        GET /feedback/{id} (get single) ✅
+        POST /feedback/ (create) ✅
+        PATCH /feedback/{id} (update) ✅
+        DELETE /feedback/{id} (delete) ✅
+    - item: "No undocumented endpoints exist"
+      status: "PASS"
+      note: >
+        Only GET /health exists beyond the contract endpoints. This is a
+        standard health check from api-patterns.md, not a business endpoint.
+    - item: "Response shapes match contract schemas"
+      status: "PASS"
+      note: "Contract tests validate all FeedbackRead fields match exactly. No extra fields."
+    - item: "All documented error codes are returned correctly"
+      status: "PASS"
+      note: >
+        404 with {detail: "Feedback item not found"} ✅
+        422 for validation errors (automatic Pydantic) ✅
+        201 for create ✅
+        204 for delete ✅
+
+  security:
+    - item: "Auth required on all endpoints that modify data"
+      status: "N/A"
+      note: "No auth in scope per ui-spec (out of scope). No user accounts."
+    - item: "All user inputs validated before business logic"
+      status: "FAIL"
+      note: >
+        Empty strings and whitespace-only strings pass validation for client_name
+        and summary. BUG-001/002/003/005. Pydantic schemas lack min_length.
+    - item: "No secrets or credentials in code"
+      status: "PASS"
+      note: "config.py has default database URL (development defaults only). .env.example pattern used."
+    - item: "No sensitive data in logs or error responses"
+      status: "PASS"
+      note: "Error responses are human-readable detail strings. No stack traces exposed."
+    - item: "K2 constraints respected"
+      status: "N/A"
+      note: "Standalone app, no external system integrations."
+
+  documentation:
+    - item: "Non-obvious functions have JSDoc/TSDoc comments"
+      status: "PASS"
+      note: "API client functions are self-documenting. Test functions have docstrings."
+    - item: "api-contract.yaml updated for any new/changed endpoints"
+      status: "PASS"
+      note: "Contract was written first, code follows it. No drift."
+    - item: "Migration files are named clearly and reversible"
+      status: "PASS"
+      note: "alembic/versions/1f4997a62a36_create_feedback_table.py — clear name, autogenerated."
+
+  feature_completeness:
+    - item: "Loading states on all async UI operations"
+      status: "PASS"
+      note: >
+        FeedbackListClient shows "Loading..." during fetch.
+        EditFeedbackClient shows "Loading..." during fetch.
+        FeedbackForm shows "Saving..." / "Deleting..." during submit.
+    - item: "Error states on all async UI operations"
+      status: "PASS"
+      note: >
+        FeedbackListClient shows red error text on fetch failure.
+        FeedbackForm shows red alert banner on submit/delete failure.
+        EditFeedbackClient shows NotFoundState on 404.
+    - item: "Escalations: all are resolved"
+      status: "PASS"
+      note: "No open escalations."
+    - item: "Agent assumptions: all reviewed and confirmed by human"
+      status: "PENDING"
+      note: "No done signals found from build agents. Assumptions from implementation plan open questions need human confirmation."
+
+  delivery:
+    - item: "Conventional commit message used"
+      status: "UNCHECKED"
+      note: "Cannot verify — no commits observed in this review."
+    - item: "PR description explains why, not just what"
+      status: "UNCHECKED"
+      note: "No PR created yet."
+    - item: "No unintended files in diff"
+      status: "UNCHECKED"
+      note: "Cannot verify without diff."
+    - item: "Reviewer agent report attached to PR"
+      status: "IN PROGRESS"
+      note: "This report."
+
+  ai_specific:
+    - item: "Build and test agents were separate"
+      status: "PASS"
+      note: "Test files are in tests/ directory, separate from router code. Test findings report authored by tester agent."
+    - item: "All done signal assumptions reviewed"
+      status: "FAIL"
+      note: "No done signals found from build agents. Cannot verify assumptions."
+    - item: "No contract drift — agents didn't improvise beyond the spec"
+      status: "PASS"
+      note: >
+        Implementation matches contract exactly. No extra endpoints, no extra
+        fields, no schema deviations. Enum values match contract strings.
+        All 5 endpoints have correct methods, paths, and status codes.
+    - item: "Escalation log reviewed — any open escalations are blockers"
+      status: "PASS"
+
+# ═══════════════════════════════════════════════════════════════════
+# ISSUES
+# ═══════════════════════════════════════════════════════════════════
+
+issues:
+
+  blockers:
+    - id: "BLOCK-001"
+      file: "app/backend/app/schemas/feedback.py"
+      line: "21-22"
+      title: "Empty strings accepted for required fields client_name and summary"
+      description: >
+        FeedbackCreate schema uses bare `str` type for client_name and summary.
+        Empty string "" passes Pydantic validation and creates a feedback item
+        with blank fields. The contract says these are required — semantically,
+        an empty string is not a valid value.
+      fix: "Add `min_length=1` to client_name and summary fields using Field(min_length=1)"
+      test_evidence: "BUG-001, BUG-002 from test-findings"
+      promote: false
+
+    - id: "BLOCK-002"
+      file: "app/backend/app/schemas/feedback.py"
+      line: "29"
+      title: "Empty string accepted for client_name on PATCH"
+      description: >
+        FeedbackUpdate.client_name has no min_length validation. A PATCH with
+        client_name="" blanks out a valid feedback item's client name.
+      fix: "Add `min_length=1` to FeedbackUpdate fields: `client_name: str | None = Field(None, min_length=1)`"
+      test_evidence: "BUG-005 from test-findings"
+      promote: false
+
+  warnings:
+    - id: "WARN-001"
+      file: "app/backend/app/schemas/feedback.py"
+      line: "21-22, 29-30"
+      title: "No max_length validation — will cause 500 in production PostgreSQL"
+      description: >
+        DB columns have varchar(255) for client_name and varchar(500) for summary,
+        but Pydantic schemas have no max_length. SQLite (used in tests) doesn't
+        enforce varchar length, so this passes in tests. PostgreSQL will raise
+        DataError → 500 instead of the expected 422.
+      fix: >
+        Add max_length: `client_name: str = Field(min_length=1, max_length=255)`,
+        `summary: str = Field(min_length=1, max_length=500)`
+      risk: "Medium — production-only failure, invisible in tests"
+      promote: true
+      promote_reason: >
+        Pattern: "Always add Pydantic max_length matching DB column length for varchar fields."
+        This prevents production-only 500 errors that pass in SQLite test environments.
+
+    - id: "WARN-002"
+      file: "app/backend/app/schemas/feedback.py"
+      title: "Whitespace-only strings accepted for client_name"
+      description: >
+        A string of only spaces "   " passes validation. Frontend trims before
+        submit, so this only affects direct API consumers.
+      fix: "Add a Pydantic validator that strips whitespace then checks min_length"
+      risk: "Low — frontend mitigates, API-only edge case"
+      promote: false
+
+    - id: "WARN-003"
+      file: "app/backend/app/routers/feedback.py"
+      line: 24
+      title: "List ordering not deterministic for same-second items"
+      description: >
+        ORDER BY date_logged DESC has no tiebreaker. Items created in the same
+        second (SQLite) or microsecond (PostgreSQL under load) have arbitrary order.
+      fix: "Add secondary sort: .order_by(Feedback.date_logged.desc(), Feedback.id.desc())"
+      risk: "Low — cosmetic, but causes flaky test"
+      promote: true
+      promote_reason: >
+        Pattern: "Always add a deterministic secondary sort (usually by id DESC)
+        when ordering by timestamp." Prevents flaky tests and UI jitter.
+
+    - id: "WARN-004"
+      file: "app/backend/app/routers/feedback.py"
+      line: 14
+      title: "Variable shadowing: 'status' query param shadows fastapi.status module"
+      description: >
+        The query parameter name `status` shadows `from fastapi import status`.
+        Safe now but fragile for future changes.
+      fix: "Rename query param to `status_filter` or alias the import"
+      risk: "Low"
+      promote: false
+
+    - id: "WARN-005"
+      file: "app/frontend/package.json"
+      title: "Zero frontend test infrastructure"
+      description: >
+        No vitest, @testing-library/react, jsdom, or any test framework in
+        devDependencies. Frontend components have zero test coverage. The DoD
+        requires tests for business logic, and the frontend has validation logic,
+        debounce logic, and API integration that should be tested.
+      fix: >
+        Add vitest + @testing-library/react + jsdom to devDependencies.
+        Write tests for: FeedbackForm validation, FilterBar filter logic,
+        FeedbackListClient fetch/debounce behaviour.
+      risk: "High — zero frontend coverage"
+      promote: false
+
+    - id: "WARN-006"
+      file: "app/frontend/src/components/forms/FeedbackForm.tsx"
+      title: "FeedbackForm component exceeds 30-line function limit"
+      description: >
+        The FeedbackForm function is ~298 lines. While this is common for React
+        form components, the DoD says "No functions over 30 lines." The handlers
+        inside are each well-sized, but the component as a whole is large. Could
+        be decomposed: extract form field components, extract useFormState hook.
+      fix: >
+        Extract a useFormState custom hook for state/validation logic.
+        Extract FormField component for repeated label+input+error pattern.
+      risk: "Low — code is readable as-is, but violates DoD literally"
+      promote: false
+
+    - id: "WARN-007"
+      file: "app/backend/app/models/feedback.py"
+      line: 17
+      title: "updated_at onupdate=func.now() not tested for PATCH"
+      description: >
+        The test suite verifies date_logged doesn't change on PATCH, but does not
+        verify that updated_at DOES change. SQLAlchemy onupdate may behave
+        differently with SQLite vs PostgreSQL. This regression would be invisible.
+      fix: "Add assertion in test_update_does_not_change_date_logged that updated_at >= date_logged"
+      risk: "Medium — audit trail field may silently break"
+      promote: false
+
+    - id: "WARN-008"
+      file: "app/backend/pyproject.toml"
+      line: 19
+      title: "Test dependency pyyaml missing"
+      description: >
+        test_contracts.py imports yaml (pyyaml) to load the contract file, but
+        pyyaml is not listed in dev dependencies. Tests only pass because pyyaml
+        is installed as a transitive dependency (likely from alembic or uvicorn).
+      fix: "Add 'pyyaml>=6.0' to [project.optional-dependencies] dev"
+      risk: "Low — could break in clean install"
+      promote: false
+
+  notes:
+    - id: "NOTE-001"
+      title: "Implementation matches plan exactly — no deviations detected"
+      description: >
+        All files match the implementation plan's file list. Component tree
+        matches. Data fetching strategy (client-side) matches. Enum values
+        match. All 10 architectural decisions from the plan are reflected in code.
+        No undocumented deviations.
+
+    - id: "NOTE-002"
+      title: "Frontend UI matches ui-spec faithfully"
+      description: >
+        - AppHeader: title "Client Feedback Tracker" + "Log Feedback" button → /feedback/new ✅
+        - FilterBar: search input + theme dropdown + status dropdown + "Clear filters" with X icon ✅
+        - FeedbackTable: 6 columns (Client, Summary, Theme badge, Status badge, Date Logged, Edit link) ✅
+        - Theme badge colours: purple/orange/blue/pink/teal — exact match to ui-spec ✅
+        - Status badge colours: blue/amber/green — exact match to ui-spec ✅
+        - EmptyState: two variants (no data + no matches) with correct text ✅
+        - FeedbackForm: create/edit mode with correct button text ✅
+        - Form validation: blur-based with red border + error text ✅
+        - Delete: window.confirm with correct message text ✅
+        - NotFoundState: correct text + "Return to list" link ✅
+        - Date format: en-US with Mon DD, YYYY ✅
+        - Row hover: bg-gray-50 transition ✅
+        - 404 redirect to /feedback ✅
+        - Root redirect / → /feedback ✅
+
+    - id: "NOTE-003"
+      title: "Search debounce implemented correctly"
+      description: >
+        300ms debounce on search input, immediate fetch on dropdown changes.
+        Uses useRef for timer cleanup. Matches implementation plan open question default.
+
+    - id: "NOTE-004"
+      title: "Frontend properly handles maxLength on inputs"
+      description: >
+        client_name input has maxLength={255}, summary input has maxLength={500}.
+        Matches DB column constraints and implementation plan open question #5 default.
+
+    - id: "NOTE-005"
+      title: "Test quality is high — adversarial approach confirmed"
+      description: >
+        81 tests including: SQL injection, empty strings, whitespace-only strings,
+        case sensitivity, invalid enums, double delete, type coercion, long strings,
+        boundary IDs (0, -1, non-integer), empty body PATCH (no-op), combined
+        filters, "In Progress" space in query param. Well beyond happy path.
+
+    - id: "NOTE-006"
+      title: "Next.js 15 params pattern correctly used"
+      description: >
+        EditFeedbackPage uses `params: Promise<{ id: string }>` with `await params`
+        — correct for Next.js 15 async params API.
+
+    - id: "NOTE-007"
+      title: "API client properly handles 204 No Content"
+      description: >
+        Separate requestNoContent function for DELETE avoids trying to parse
+        empty response body as JSON. Good pattern.
+      promote: true
+      promote_reason: >
+        Pattern: "Separate request helper for 204 No Content responses
+        to avoid JSON parse errors on empty bodies."
+
+# ═══════════════════════════════════════════════════════════════════
+# CONTRACT COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════
+
+contract_compliance:
+  status: "✅ Clean"
+  details:
+    - "All 5 endpoints implemented with correct methods and paths"
+    - "All response shapes match FeedbackRead schema exactly"
+    - "All error shapes match (404 detail text, 422 Pydantic format)"
+    - "All status codes match contract (200, 201, 204, 404, 422)"
+    - "Enum values match contract exactly (case-sensitive)"
+    - "Query params match contract definition (search, theme, status)"
+    - "PATCH semantics correct (exclude_unset=True, partial update)"
+    - "No undocumented endpoints (only /health — standard pattern)"
+    - "No extra fields in response beyond contract schema"
+    - "FeedbackCreate defaults work (status → Open, detail → null)"
+
+# ═══════════════════════════════════════════════════════════════════
+# PLAN COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════
+
+plan_compliance:
+  status: "✅ Full compliance"
+  file_list_match: true
+  component_tree_match: true
+  deviations: []
+  notes:
+    - "All 10 architectural decisions from the plan are reflected in implementation"
+    - "Shared types match plan's verbatim definitions exactly"
+    - "Client-side fetching strategy implemented as planned"
+    - "No service layer (as decided in plan decision #1)"
+    - "SAEnum with display strings (decision #5)"
+    - "date_logged DESC ordering (decision #6)"
+    - "Separate ThemeBadge/StatusBadge (decision #3)"
+    - "Single FeedbackForm with mode prop (decision #4)"
+    - "Catch-all 404 via not-found.tsx (decision #10)"
+
+# ═══════════════════════════════════════════════════════════════════
+# ASSUMPTIONS FLAGGED
+# ═══════════════════════════════════════════════════════════════════
+
+assumptions_flagged:
+  - source: "Implementation plan open question #1"
+    assumption: "300ms debounce on search input"
+    risk: "None — implemented correctly, sensible default"
+    status: "Confirm or adjust"
+
+  - source: "Implementation plan open question #2"
+    assumption: "Simple 'Loading...' text, no skeleton UI"
+    risk: "None — implemented correctly"
+    status: "Confirm"
+
+  - source: "Implementation plan open question #3"
+    assumption: "Always English date format (en-US)"
+    risk: "Low — may need i18n later"
+    status: "Confirm"
+
+  - source: "Implementation plan open question #5"
+    assumption: "maxLength on inputs matches DB constraints"
+    risk: "None — implemented correctly"
+    status: "Confirm"
+
+  - source: "No done signals from build agents"
+    assumption: "Build agents did not produce done signal files"
+    risk: "Medium — cannot verify what assumptions they made during implementation"
+    status: "Human should verify no undocumented assumptions were made"
+
+# ═══════════════════════════════════════════════════════════════════
+# PATTERNS TO PROMOTE
+# ═══════════════════════════════════════════════════════════════════
+
+patterns_to_promote:
+  - pattern: "Pydantic max_length matching DB varchar"
+    description: >
+      Always add max_length to Pydantic str fields that correspond to varchar(N)
+      DB columns. Prevents production-only 500 errors when SQLite tests don't
+      enforce column length limits.
+    source: "WARN-001"
+
+  - pattern: "Deterministic secondary sort on timestamp ordering"
+    description: >
+      When ordering by timestamp, always add a secondary sort by id DESC.
+      Prevents flaky tests and non-deterministic UI ordering.
+    source: "WARN-003"
+
+  - pattern: "Separate request helper for 204 No Content"
+    description: >
+      Use a dedicated request function for DELETE/204 responses that doesn't
+      attempt to parse the response body as JSON.
+    source: "NOTE-007"
+
+# ═══════════════════════════════════════════════════════════════════
+# RECOMMENDATION
+# ═══════════════════════════════════════════════════════════════════
+
+recommendation: >
+  MERGE WITH CONDITIONS.
+
+  Required before merge (blockers):
+  1. Fix BLOCK-001/002: Add min_length=1 to client_name and summary in both
+     FeedbackCreate and FeedbackUpdate schemas. This is a ~4 line change in
+     schemas/feedback.py. Send back to backend agent.
+  2. Verify the 5 failing tests pass after the fix.
+
+  Strongly recommended (warnings — human decides):
+  3. Add max_length=255/500 to Pydantic fields (WARN-001) — production safety.
+  4. Add secondary sort by id DESC (WARN-003) — deterministic ordering.
+  5. Add pyyaml to dev dependencies (WARN-008) — clean install safety.
+
+  Can defer to follow-up:
+  6. Frontend test infrastructure (WARN-005) — important but separate workstream.
+  7. FeedbackForm decomposition (WARN-006) — cosmetic.
+  8. Whitespace-only validation (WARN-002) — frontend mitigates.
+  9. updated_at test assertion (WARN-007) — test coverage gap.
+  10. Status variable shadowing (WARN-004) — low risk.

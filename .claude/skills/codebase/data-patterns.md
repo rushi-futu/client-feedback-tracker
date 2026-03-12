@@ -148,3 +148,35 @@ def client():
 - Never call `db.commit()` in a router — only in the router after all operations succeed
 - Never lazy-load relationships in a loop — use `joinedload()` or `selectinload()`
 - Never put `Base.metadata.create_all()` in production — use alembic only
+
+---
+## Pattern: Pydantic max_length matching DB varchar
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-073943.yaml -->
+
+Always add `max_length` to Pydantic `str` fields that correspond to `varchar(N)` DB columns. SQLite does not enforce column length limits, so tests will pass even when strings exceed the DB constraint. In production PostgreSQL, oversized strings cause `DataError` → 500 instead of the expected 422.
+
+```python
+# DB model
+client_name = Column(String(255), nullable=False)
+summary = Column(String(500), nullable=False)
+
+# Pydantic schema — max_length MUST match DB column length
+client_name: str = Field(min_length=1, max_length=255)
+summary: str = Field(min_length=1, max_length=500)
+```
+
+---
+## Pattern: Deterministic secondary sort on timestamp ordering
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-073943.yaml -->
+
+When ordering query results by a timestamp column, always add a secondary sort by `id DESC`. Items created within the same second (SQLite) or microsecond (PostgreSQL under load) will otherwise have arbitrary order, causing flaky tests and non-deterministic UI rendering.
+
+```python
+# Bad — non-deterministic for same-timestamp rows
+db.query(Feedback).order_by(Feedback.date_logged.desc())
+
+# Good — deterministic tiebreaker
+db.query(Feedback).order_by(Feedback.date_logged.desc(), Feedback.id.desc())
+```

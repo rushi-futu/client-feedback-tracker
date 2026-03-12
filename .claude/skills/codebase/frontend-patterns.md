@@ -94,6 +94,22 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+// --- Pattern: Separate request helper for 204 No Content ---
+// Promoted: 2026-03-12
+// Source: escalation/log/review-20260312-073943.yaml
+// DELETE endpoints return 204 with no body. Calling res.json() on an empty
+// body throws a parse error. Use a separate helper that doesn't parse JSON.
+async function requestNoContent(path: string, options?: RequestInit): Promise<void> {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...options,
+  })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Request failed" }))
+    throw new Error(error.detail ?? `HTTP ${res.status}`)
+  }
+}
+
 export const getBriefs = () =>
   request<Brief[]>("/briefs/")
 
@@ -111,6 +127,9 @@ export const getAssignment = (briefId: number) =>
 
 export const approveAssignment = (assignmentId: number) =>
   request<Assignment>(`/assignments/${assignmentId}/approve`, { method: "POST" })
+
+export const deleteBrief = (id: number) =>
+  requestNoContent(`/briefs/${id}`, { method: "DELETE" })
 ```
 
 ## TypeScript Types Pattern
