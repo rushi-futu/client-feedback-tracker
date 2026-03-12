@@ -56,13 +56,15 @@ tools:
 
   # ── EXAMPLES — uncomment and configure what you're using ──
 
-  # Figma (design context for frontend agent)
-  # - name: figma
-  #   type: mcp
-  #   purpose: "Fetch component specs, tokens, and design decisions before building UI"
-  #   available_to: [frontend, architect]
-  #   required_before: [build]   ← frontend must query Figma before writing any UI
-  #   optional: false
+  # Figma (design context — primary prototype input)
+  - name: figma
+    type: mcp
+    purpose: "Read designs directly — layout, components, tokens, variants, text content"
+    available_to: [visual, frontend, architect]
+    required_before: [read-prototype, build]
+    optional: false
+    setup: "claude mcp add --transport http figma https://mcp.figma.com/mcp"
+    auth: "Run /mcp in Claude Code → select figma → Authenticate → Allow Access"
 
   # GitHub (codebase and PR context)
   # - name: github
@@ -174,3 +176,20 @@ compound_loop:
 
   # Freshness — how often K2 should be refreshed (days)
   k2_refresh_days: 7
+
+  # ── FIGMA SYNC (design ↔ code) ──
+  # After delivery, capture the built UI and push it back to Figma.
+  # This keeps the prototype in sync with what was shipped.
+  # PM can then use Figma Make to iterate on the updated prototype.
+  figma_sync:
+    enabled: true
+    # The Figma file key for the prototype (extracted from the Figma URL).
+    # Set this after the PM creates the initial prototype.
+    # e.g. "abc123DEF" from figma.com/design/abc123DEF/...
+    figma_file_key: "vDiknMrMUS6GHtyv127HfZ"
+    # When to sync: "post_merge" or "post_review"
+    trigger: "post_merge"
+    # Also update Code Connect mappings (links Figma nodes to source files)
+    code_connect: true
+    # Dev server URL for capture (auto-detected from stack if blank)
+    dev_server_url: ""

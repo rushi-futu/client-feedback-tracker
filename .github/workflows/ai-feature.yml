@@ -45,7 +45,7 @@ on:
         required: true
         type: string
       prototype_url:
-        description: "v0 or prototype URL (leave blank to skip visual step)"
+        description: "Figma Make URL or prototype URL (leave blank to skip visual step)"
         required: false
         type: string
       branch:

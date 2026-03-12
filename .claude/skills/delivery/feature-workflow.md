@@ -62,6 +62,12 @@ something that needs a decision. Between escalations, agents run.
         ↓
 9. HUMAN decides ← DECISION POINT
    MERGE / REWORK / MERGE WITH CONDITIONS
+        ↓
+10. COMPOUND LOOP (post-merge)
+    /promote-patterns — promotes reusable patterns to knowledge base
+    /sync-to-figma   — captures built UI, pushes back to Figma prototype
+    → PM can now use Figma Make to iterate on the updated design
+    → next feature starts from what was shipped, not from scratch
 ```
 
 ## Human Decision Points: When and Why

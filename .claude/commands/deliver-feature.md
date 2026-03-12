@@ -117,3 +117,34 @@ Show the review summary. Ask: "Open PR? (or tell me what needs fixing)"
 Create a PR with `gh pr create` targeting main. Include a summary of all gates passed.
 
 Tell the user the PR URL.
+
+## Phase 9: Compound Loop
+
+After the PR is merged (or if the user says to run it now):
+
+### 9a: Promote Patterns
+
+Read and follow `.claude/commands/promote-patterns.md`.
+Promote any reusable patterns from the review report to the knowledge base.
+
+### 9b: Sync to Figma
+
+Read `config/harness.config.yaml` → `compound_loop.figma_sync`.
+If `enabled: true` and `figma_file_key` is set:
+
+Read and follow `.claude/commands/sync-to-figma.md`.
+This captures the built UI and pushes it back to the Figma prototype.
+The PM can then use Figma Make to iterate on the updated design.
+
+If `figma_file_key` is empty, ask the user:
+"Want to sync the built UI back to Figma? Paste the Figma file URL."
+
+### Compound Loop Done Signal
+
+```
+🔄 COMPOUND LOOP COMPLETE
+Patterns promoted: [count or "none"]
+Figma synced: [yes/no — with URL if yes]
+The prototype and knowledge base now reflect what was shipped.
+Next iteration starts from here.
+```

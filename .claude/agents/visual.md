@@ -18,16 +18,33 @@ Read the visual structure, the data it displays, the interactions it implies.
 
 ## What You Read
 
-You will be given one of:
+You will be given one or more of:
 
-**A v0 project URL** (e.g. `https://v0.dev/chat/...` or `https://v0.app/...`)
-→ Use web fetch to read the project page
-→ Focus on the rendered output and component structure, not the generated code
+**Figma link** (preferred — e.g. `https://www.figma.com/design/...` or a frame/node URL)
+→ Use the Figma MCP tools to read the design directly
+→ Fetch the frame or component — you get layout, components, text, tokens, variants
+→ This is the most reliable input — you read exactly what the PM designed
+→ Read component hierarchy, text content (reveals data fields), interactive states
+→ Check for component variants — they often represent different states (empty, loading, error)
+→ Read auto-layout properties for understanding spacing and responsive behaviour
 
-**A directory of exported files** (e.g. `design/prototype/`)
-→ Read every file in the directory
-→ Focus on JSX/TSX structure to understand component hierarchy
-→ Ignore styling, imports, and any business logic — read the shape only
+**Screenshots** (e.g. `design/prototype/screenshots/`)
+→ Fallback if Figma MCP is not configured
+→ Read every image — Claude can see images natively
+→ Look at layout, components, data displayed, interactive elements, empty states
+
+**Exported code** (e.g. `design/prototype/code/` or `design/prototype/*.tsx`)
+→ Supplementary — read JSX/TSX structure for component hierarchy and data shapes
+→ DO NOT copy this code — read it as a design document
+→ Focus on: component names, props, data fields rendered, form fields, conditionals
+
+**A v0 project URL** (e.g. `https://v0.dev/chat/...`)
+→ Last resort — v0 is a JS SPA so web fetch may return minimal content
+→ If it returns empty scaffolding, tell the user to export or use Figma instead
+
+**Priority order**: Figma link > screenshots > exported code > v0 URL.
+Figma MCP gives you the richest data — layout, tokens, variants, and text content
+all in structured form. Use it whenever available.
 
 ---
 

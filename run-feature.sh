@@ -276,3 +276,22 @@ EOF
   --head "$BRANCH"
 
 ok "Done! PR created."
+
+# ── Compound Loop (optional, post-merge) ──────────────────────────
+echo ""
+echo -e "${CYAN}═══════════════════════════════════════${NC}"
+echo -e "${CYAN}  Next: Compound Loop${NC}"
+echo -e "${CYAN}═══════════════════════════════════════${NC}"
+echo ""
+echo "  After the PR is merged, run the compound loop to:"
+echo "    1. Promote reusable patterns to the knowledge base"
+echo "    2. Sync the built UI back to Figma (PM can iterate with Make)"
+echo "    3. Run a GC health scan"
+echo ""
+echo "  Run:  ./run-compound.sh all"
+echo "  Or individually:"
+echo "    ./run-compound.sh promote"
+echo "    ./run-compound.sh sync"
+echo "    ./run-compound.sh gc"
+echo ""
+echo "  (On GitHub, this runs automatically via ai-compound.yml on merge)"

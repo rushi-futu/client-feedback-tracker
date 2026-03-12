@@ -20,9 +20,9 @@ See `config/harness.config.yaml` for project settings. Read it before any task.
 ## The Delivery Flow
 
 ```
-PM builds prototype (v0 or similar)
+PM creates prototype in Figma Make
   ↓
-visual agent — reads prototype, produces design/ui-spec.md
+visual agent — reads Figma via MCP, produces design/ui-spec.md
   ↓
 GATE: PM approves — "yes, you understood my design"
   ↓
@@ -45,6 +45,10 @@ reviewer — DoD + contract + plan compliance report
 GATE: Eng approves merge
   ↓
 PR opened — merge when ready
+  ↓
+COMPOUND LOOP — promote patterns + sync built UI back to Figma
+  ↓
+PM iterates on updated Figma prototype (compounding)
 ```
 
 ---

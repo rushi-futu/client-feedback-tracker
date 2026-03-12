@@ -1,10 +1,13 @@
 # Compound Learning Loop
 #
-# Runs automatically after every merge to main.
-# Reads the reviewer report from that feature, extracts patterns worth keeping,
-# and writes them back into the skill files — so the next feature starts smarter.
+# Runs automatically after every merge to main. Two jobs:
+# 1. Pattern promotion — extracts reusable patterns from the review report
+#    and writes them back into skill files
+# 2. Figma sync — captures the built UI and pushes it back to the Figma prototype
+#    so the PM can iterate with Figma Make on what was actually shipped
 #
 # This is what makes the harness compound: each delivery improves the next.
+# Configure in config/harness.config.yaml → compound_loop.
 
 name: Compound Learning Loop
 
@@ -88,3 +91,65 @@ jobs:
             git push origin main
             echo "✅ Patterns promoted to skill files"
           fi
+
+  # ── Sync built UI back to Figma ──────────────────────────────────
+  # Captures the running application and pushes it back to the Figma prototype.
+  # PM can then use Figma Make to iterate on the updated design.
+  # Only runs if figma_sync is enabled and figma_file_key is set in config.
+  sync-to-figma:
+    name: "Sync built UI → Figma prototype"
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check if Figma sync is enabled
+        id: check
+        run: |
+          ENABLED=$(grep -A1 'figma_sync:' config/harness.config.yaml 2>/dev/null | grep 'enabled:' | awk '{print $2}' || echo "false")
+          KEY=$(grep 'figma_file_key:' config/harness.config.yaml 2>/dev/null | awk '{print $2}' | tr -d '"' || echo "")
+          echo "enabled=${ENABLED}" >> $GITHUB_OUTPUT
+          echo "figma_key=${KEY}" >> $GITHUB_OUTPUT
+          if [ "$ENABLED" != "true" ] || [ -z "$KEY" ]; then
+            echo "Figma sync disabled or no file key set — skipping"
+          fi
+
+      - name: Install Claude Code
+        if: steps.check.outputs.enabled == 'true' && steps.check.outputs.figma_key != ''
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Capture and push to Figma
+        if: steps.check.outputs.enabled == 'true' && steps.check.outputs.figma_key != ''
+        env:
+          FIGMA_KEY: ${{ steps.check.outputs.figma_key }}
+        run: |
+          claude \
+            --dangerously-skip-permissions \
+            -p "$(cat << PROMPT
+          You are syncing the built application back to Figma as part of the compound loop.
+
+          Figma file key: ${FIGMA_KEY}
+
+          Read design/ui-spec.md to find the pages/routes to capture.
+          Read config/harness.config.yaml for the stack to determine the dev server command.
+
+          Your job:
+          1. Install dependencies and start the dev server in the background
+          2. Wait for it to be ready
+          3. For each page/route in the ui-spec:
+             - Call generate_figma_design (Figma MCP) to capture the running page
+             - Use outputMode: existingFile with fileKey: ${FIGMA_KEY}
+             - Follow the capture instructions returned by the tool
+             - Poll with captureId until completed
+          4. After all pages captured, use send_code_connect_mappings (Figma MCP) to link
+             key components to their source files
+          5. Stop the dev server
+          6. Report what was captured and what was mapped
+          PROMPT
+          )"

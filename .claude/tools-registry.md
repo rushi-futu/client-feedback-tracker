@@ -30,12 +30,17 @@ Check `config/harness.config.yaml` → `tools:` section. Each entry has:
 
 ---
 
-### figma (MCP) — if configured
-**Available to**: frontend, architect  
-**Required before**: build (UI features only)  
-**What it gives you**: component specs, design tokens, layout decisions, interaction states  
-**How to use**: fetch the specific frame or component URL from the ticket/task, not the whole file  
-**If unreachable**: raise escalation type `ambiguity` — do not guess at design decisions
+### figma (MCP)
+**Available to**: visual, frontend, architect
+**Required before**: read-prototype (visual), build (frontend — UI features only)
+**What it gives you**: component hierarchy, layout properties, text content (reveals data fields), design tokens (colors, typography, spacing), component variants (states), auto-layout
+**How to use**:
+- Visual agent: pass the Figma file/frame URL from the task → read design structure → produce ui-spec.md
+- Frontend agent: pass specific component URLs → read tokens, spacing, typography → match implementation to design
+- Architect: pass page-level frames → read component inventory → ground contract in real UI
+- Always fetch specific frames or components, not the entire file
+- Use node URLs (with `?node-id=...`) for precision
+**If unreachable**: fall back to screenshots in `design/prototype/screenshots/`. If no screenshots either, raise escalation type `ambiguity` — do not guess at design decisions
 
 ---
 
@@ -77,19 +82,27 @@ Check `config/harness.config.yaml` → `tools:` section. Each entry has:
 
 ## Tool call sequence by phase
 
+### /read-prototype (visual)
+```
+1. figma: fetch frame/page URL from task                   [required if configured]
+2. → read component hierarchy, text, tokens, variants
+3. → produce design/ui-spec.md
+```
+
 ### /plan (architect)
 ```
-1. k2-system-context: list_services → check_safety        [required if k2_mode=mcp]
-2. github: search existing patterns                        [required if configured]
-3. linear: fetch ticket                                    [required if configured]
-4. confluence: search relevant ADRs                        [optional]
-5. → produce API contract and task list
+1. figma: fetch page-level frames for component inventory  [optional — supplements ui-spec]
+2. k2-system-context: list_services → check_safety         [required if k2_mode=mcp]
+3. github: search existing patterns                        [required if configured]
+4. linear: fetch ticket                                    [required if configured]
+5. confluence: search relevant ADRs                        [optional]
+6. → produce API contract and task list
 ```
 
 ### /build (frontend)
 ```
 1. figma: fetch component specs for this feature           [required if configured]
-2. → implement against approved API contract
+2. → implement against approved API contract + design tokens
 ```
 
 ### /build (backend)
@@ -111,6 +124,16 @@ Check `config/harness.config.yaml` → `tools:` section. Each entry has:
 3. → produce review report
 ```
 
+### /sync-to-figma (compound loop)
+```
+1. figma: generate_figma_design — capture running app      [required]
+   → outputMode: "existingFile", push to same Figma file
+   → one capture per page/route from ui-spec.md
+2. figma: send_code_connect_mappings — link components     [optional]
+   → maps each built component to its source file
+3. → prototype updated, PM can iterate with Figma Make
+```
+
 ---
 
 ## Adding a new tool
@@ -124,16 +147,30 @@ Check `config/harness.config.yaml` → `tools:` section. Each entry has:
 
 ## visual agent tools
 
-### web-fetch
-- available_to: visual
+### figma (MCP) — primary
+- available_to: visual, frontend, architect
 - required_before: read-prototype
-- optional: false (when prototype_url is provided)
-- purpose: Fetch the prototype URL to read the rendered component structure
-- usage: Use web fetch on the prototype URL. Read the HTML/JSX structure. Do not execute JavaScript.
+- optional: false (when figma_url is provided)
+- purpose: Read Figma frames directly — layout, components, text, tokens, variants
+- usage: Pass the Figma frame/page URL. Read component hierarchy and data shapes from structured MCP response. Check for variants (represent states). Read text content (reveals data fields displayed).
 
-### design/prototype/ directory
+### design/prototype/screenshots/ — fallback
 - available_to: visual
-- required_before: read-prototype
+- required_before: read-prototype (if no Figma MCP)
 - optional: true
-- purpose: Read exported prototype files if no URL is provided
-- usage: Read all .tsx/.jsx files. Extract component hierarchy and data shapes.
+- purpose: Screenshots of the prototype when Figma MCP is not available
+- usage: Read every image. Claude sees images natively. Extract layout, components, data fields.
+
+### design/prototype/code/ — supplementary
+- available_to: visual
+- required_before: nothing
+- optional: true
+- purpose: Exported prototype code for component hierarchy reference
+- usage: Read JSX/TSX structure. Extract component names, props, data shapes. Do not copy code.
+
+### web-fetch — last resort
+- available_to: visual
+- required_before: nothing
+- optional: true
+- purpose: Fetch a v0 or prototype URL (unreliable for JS SPAs)
+- usage: Try web fetch. If it returns empty scaffolding, fall back to screenshots or Figma.
