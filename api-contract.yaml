@@ -1,0 +1,120 @@
+# API Contract — Client Feedback Tracker
+# Maintained by: architect agent
+# All changes require human approval before implementation begins.
+
+# ============================================================================
+# Feature: Client Feedback CRUD
+# Added: 2026-03-12
+# Status: APPROVED
+# UI source: design/ui-spec.md (APPROVED)
+# ============================================================================
+
+endpoints:
+
+  # --- List all feedback ---
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackTable component on /feedback — returns all feedback items, newest first. Filtering is client-side per ui-spec."
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  # --- Get single feedback item ---
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Feeds FeedbackForm (edit mode) on /feedback/:id — returns one item for pre-population"
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+
+  # --- Create feedback item ---
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+
+  # --- Update feedback item ---
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) 'Save Changes' submission on /feedback/:id"
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: { detail: string }
+
+  # --- Delete feedback item ---
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Handles 'Delete' button on /feedback/:id — triggered after browser confirm()"
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: "Feedback item not found" }
+
+schemas:
+
+  Theme:
+    type: enum
+    values: ["UX", "Performance", "Support", "Pricing", "Communication"]
+    notes: "Fixed set for MVP. Maps to color-coded badges in FeedbackTable."
+
+  Status:
+    type: enum
+    values: ["Open", "In Progress", "Actioned"]
+    notes: "Fixed set for MVP. Maps to color-coded badges in FeedbackTable."
+
+  FeedbackCreate:
+    purpose: "Request body for POST /feedback/"
+    fields:
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+    required: [client_name, summary, theme]
+    defaults:
+      status: "Open"
+      detail: null
+    notes: "status defaults to 'Open' on create per ui-spec. detail is optional."
+
+  FeedbackUpdate:
+    purpose: "Request body for PATCH /feedback/{id}"
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: Status | null
+    required: []
+    notes: "All fields optional — only provided fields are updated (PATCH semantics)."
+
+  FeedbackRead:
+    purpose: "Response body for all feedback endpoints"
+    fields:
+      id: integer
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+      date_logged: datetime
+    required: [id, client_name, summary, theme, status, date_logged]
+    notes: |
+      - id is integer (codebase convention), frontend coerces to string for URL params
+      - date_logged is auto-set on creation (server_default), not editable
+      - detail may be null if not provided on create
+      - Returned in descending date_logged order from list endpoint

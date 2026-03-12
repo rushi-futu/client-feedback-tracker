@@ -204,6 +204,90 @@ export function CreateBriefForm({ onSuccess }: { onSuccess: () => void }) {
 }
 ```
 
+---
+
+## Pattern: Server Component Page + Client Wrapper
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-111941.md -->
+
+When a page needs server-fetched data AND client-side interactivity (useState, filtering,
+event handlers), split into two files:
+
+1. `page.tsx` — async server component that fetches data
+2. `FooClient.tsx` — "use client" wrapper that receives data as props and owns all state
+
+```tsx
+// app/frontend/src/app/feedback/page.tsx (server component)
+import { getFeedbackItems } from "@/lib/api"
+import { FeedbackListClient } from "@/components/feedback/FeedbackListClient"
+
+export default async function FeedbackPage() {
+  const items = await getFeedbackItems()
+  return <FeedbackListClient initialItems={items} />
+}
+```
+
+```tsx
+// app/frontend/src/components/feedback/FeedbackListClient.tsx
+"use client"
+import { useState } from "react"
+// owns filtering, search, and all interactive state
+```
+
+This is the correct Next.js 15 pattern — never put "use client" on a page that can
+do server-side data fetching.
+
+---
+
+## Pattern: Custom shadcn Button Variants
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-111941.md -->
+
+When the UI spec requires a button style not in standard shadcn (e.g. a red outline
+delete button), extend the `buttonVariants` in `components/ui/button.tsx` rather than
+using inline styles or one-off classes:
+
+```tsx
+// In components/ui/button.tsx — add to the variants object
+const buttonVariants = cva("...", {
+  variants: {
+    variant: {
+      // ... existing variants ...
+      "destructive-outline":
+        "border border-destructive text-destructive bg-background hover:bg-destructive/10",
+    },
+  },
+})
+```
+
+This keeps all button styles in one place and avoids ad-hoc Tailwind on individual buttons.
+Never modify the shadcn base primitives — only add new variant values.
+
+---
+
+## Pattern: Bypass Generic API Helper for 204 No Content
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-111941.md -->
+
+The generic `request<T>()` helper calls `res.json()` to parse the response. For endpoints
+that return 204 No Content (e.g. DELETE), this will throw because there is no body.
+Bypass the helper and call fetch directly:
+
+```typescript
+export async function deleteFeedback(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/feedback/${id}`, { method: "DELETE" })
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ detail: "Delete failed" }))
+    throw new Error(error.detail ?? `HTTP ${res.status}`)
+  }
+  // No res.json() — 204 has no body
+}
+```
+
+Apply this pattern to any endpoint that returns 204 or has no response body.
+
+---
+
 ## Styling Rules
 
 - Tailwind utility classes only — no inline styles, no CSS modules
