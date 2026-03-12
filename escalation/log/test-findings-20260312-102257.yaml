@@ -13,9 +13,12 @@ route_to: developer
 # ═══════════════════════════════════════════════════════════════════════════
 
 summary: |
-  72 backend integration tests written, 71 passed, 1 failed.
-  20 frontend API client tests written, 20 passed.
-  1 bug found (WARNING). 2 observations for human decision.
+  RE-RUN AFTER FIX ROUND 1 — 2026-03-12T11:10:00
+  72 backend integration tests: 72 passed, 0 failed. ✅
+  20 frontend API client tests: 20 passed, 0 failed. ✅
+  BUG-001 (ordering tiebreaker) — FIXED AND VERIFIED.
+  No regressions introduced by the fix.
+  2 observations remain open (human decision pending).
 
 # ═══════════════════════════════════════════════════════════════════════════
 # BUGS
@@ -25,29 +28,18 @@ bugs:
 
   - id: BUG-001
     severity: WARNING
+    status: FIXED ✅ (verified in re-run 2026-03-12T11:10:00)
     file: app/backend/app/routers/feedback.py
-    line: 10
+    line: 12
     test: test_feedback_integration.py::TestListFeedback::test_returns_items_newest_first
     description: |
-      GET /feedback/ ordering is non-deterministic when items share the same
-      date_logged timestamp. The contract says "returned in descending
-      date_logged order from list endpoint" (newest first). The implementation
-      uses `ORDER BY date_logged DESC` but has no secondary sort key.
+      GET /feedback/ ordering was non-deterministic when items shared the same
+      date_logged timestamp.
 
-      When two items are created within the same second (common in tests and
-      in production when users submit rapidly), SQLite returns them in
-      insertion order (oldest first), which violates the contract's "newest
-      first" guarantee.
-
-      PostgreSQL behaviour may differ but is equally non-deterministic without
-      a tiebreaker.
-    impact: |
-      Users see inconsistent ordering in the feedback list. Items created
-      quickly may appear in the wrong order. The frontend receives data in
-      an order that doesn't match the contract.
+      FIX APPLIED: Secondary sort added — `ORDER BY date_logged DESC, id DESC`.
+      The test that was failing now passes. No regressions detected.
     fix_suggestion: |
-      Add secondary sort: `ORDER BY date_logged DESC, id DESC`.
-      The id column is auto-increment, so higher IDs are always newer.
+      (Applied) Add secondary sort: `ORDER BY date_logged DESC, id DESC`.
     contract_reference: |
       api-contract.yaml → GET /feedback/ → response 200:
       "Returned in descending date_logged order from list endpoint"
@@ -127,10 +119,9 @@ test_results:
     framework: pytest
     file: app/backend/tests/test_feedback_integration.py
     total: 72
-    passed: 71
-    failed: 1
-    failing_tests:
-      - TestListFeedback::test_returns_items_newest_first
+    passed: 72
+    failed: 0
+    failing_tests: []
     coverage_summary:
       integration: "5/5 endpoints"
       contract: "5/5 endpoints"
