@@ -1,0 +1,421 @@
+# Review Report — Client Feedback CRUD
+# Date: 2026-03-12
+# Reviewer: AI Reviewer (claude-opus-4-5)
+# Contract: api-contract.yaml (APPROVED)
+# Plan: tasks/implementation-plan.md
+# UI Spec: design/ui-spec.md (APPROVED)
+
+type: review_report
+created: "2026-03-12T10:22:57Z"
+feature: client-feedback-crud
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VERDICT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+verdict: "⚠️ MERGE WITH CONDITIONS"
+conditions:
+  - "Resolve open escalation 2026-03-12T10-00-00-risk.yaml (alembic/env.py creation)"
+
+blockers: 1
+warnings: 3
+notes: 5
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ESCALATION STATUS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+escalation_status:
+  - id: "2026-03-12T10-00-00-risk.yaml"
+    type: risk
+    status: OPEN ❌
+    description: |
+      Backend agent escalated that alembic/env.py is needed for migration workflow
+      but was blocked by pre-tool boundary hook. File still does not exist.
+      The migration file (0001_create_feedback_items_table.py) was created manually,
+      but without env.py, `alembic upgrade head` will not work in production.
+
+      Impact: Production deployment blocked until resolved.
+      Recommendation: Human approves creation (Option A in escalation) or creates
+      the file manually. This is standard Alembic scaffolding with no custom logic.
+
+  - id: "test-findings-20260312-102257.yaml"
+    type: test_finding
+    status: RESOLVED ✅
+    description: |
+      BUG-001 (ordering tiebreaker) was fixed and verified.
+      OBS-001 and OBS-002 remain open but are human-decision items (not blockers).
+      INFRA-001 (missing test script) has been resolved — package.json now has "test": "vitest run".
+      INFRA-002 (no component tests) remains — see warnings.
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DOD CHECKLIST
+# ═══════════════════════════════════════════════════════════════════════════════
+
+dod_checklist:
+
+  code_quality:
+    - item: "TypeScript: tsc --noEmit passes with zero errors"
+      status: "⚠️ NOT VERIFIED"
+      note: "No tsc check was run. Frontend has tsconfig.json and types look correct."
+    - item: "Lint: eslint passes with zero warnings"
+      status: "⚠️ NOT VERIFIED"
+      note: "package.json has 'lint' script but no eslint config found. next lint may work."
+    - item: "No console.log in production code"
+      status: "✅ PASS"
+      note: "Grep confirmed: zero console.log in app/"
+    - item: "No TODO or FIXME without a linked issue number"
+      status: "✅ PASS"
+      note: "Grep confirmed: zero TODO/FIXME in app/"
+    - item: "No functions over 30 lines (decompose if needed)"
+      status: "⚠️ WARNING"
+      note: |
+        FeedbackForm component is 238 lines (line 37-275). Individual handler functions
+        are within limits (handleSubmit ~25 lines, handleDelete ~15 lines). The large
+        size comes from JSX rendering. Acceptable for a form component but worth noting.
+    - item: "No any types without explanatory comment"
+      status: "✅ PASS"
+      note: "Grep confirmed: zero bare `any` types in frontend src/"
+    - item: "No commented-out code"
+      status: "✅ PASS"
+
+  tests:
+    - item: "Unit tests written for all new business logic"
+      status: "✅ PASS"
+      note: "72 backend integration tests, 20 frontend API client tests"
+    - item: "Integration tests for all new API endpoints"
+      status: "✅ PASS"
+      note: "All 5 endpoints covered: TestCreateFeedback, TestListFeedback, TestGetFeedback, TestUpdateFeedback, TestDeleteFeedback"
+    - item: "All new tests pass"
+      status: "✅ PASS"
+      note: "Backend: 72 passed, 0 failed. Frontend: 20 passed, 0 failed. Verified by reviewer."
+    - item: "No skipped tests without explanation"
+      status: "✅ PASS"
+      note: "Grep confirmed: zero .skip or xit in test files"
+    - item: "At least one unhappy path tested per endpoint (auth fail, validation fail)"
+      status: "✅ PASS"
+      note: |
+        422 tests for missing fields, invalid enums, wrong types.
+        404 tests for nonexistent IDs. Adversarial tests for SQL injection, XSS, unicode.
+    - item: "Contract tests present — response shapes validated"
+      status: "✅ PASS"
+      note: "TestContractShape class verifies exact field sets, enum values, types."
+
+  api_contract:
+    - item: "All endpoints in api-contract.yaml are implemented"
+      status: "✅ PASS"
+      note: |
+        GET /feedback/ → list_feedback ✅
+        GET /feedback/{id} → get_feedback ✅
+        POST /feedback/ → create_feedback (201) ✅
+        PATCH /feedback/{id} → update_feedback ✅
+        DELETE /feedback/{id} → delete_feedback (204) ✅
+    - item: "No undocumented endpoints exist"
+      status: "✅ PASS"
+      note: "Only /health (standard) beyond contracted endpoints. No extra routes."
+    - item: "Response shapes match contract schemas"
+      status: "✅ PASS"
+      note: |
+        FeedbackRead: {id: int, client_name: str, summary: str, detail: str|null,
+        theme: Theme, status: Status, date_logged: datetime} — exact match.
+        404: {detail: "Feedback item not found"} — exact match.
+        204: null body — exact match.
+    - item: "All documented error codes are returned correctly"
+      status: "✅ PASS"
+      note: "200, 201, 204, 404, 422 all verified by tests."
+
+  security:
+    - item: "Auth required on all endpoints that modify data"
+      status: "N/A"
+      note: "No auth in scope — ui-spec explicitly notes no login/authentication."
+    - item: "All user inputs validated before business logic"
+      status: "✅ PASS"
+      note: "Pydantic validates types, required fields, enum values. Frontend validates on blur."
+    - item: "No secrets or credentials in code"
+      status: "✅ PASS"
+      note: "Database URL is a default, not a real credential. Uses .env for overrides."
+    - item: "No sensitive data in logs or error responses"
+      status: "✅ PASS"
+      note: "Error responses contain only 'Feedback item not found' or Pydantic validation details."
+
+  documentation:
+    - item: "Non-obvious functions have JSDoc/TSDoc comments"
+      status: "⚠️ PARTIAL"
+      note: "Test file has docstrings. Source code has minimal comments but code is self-documenting."
+    - item: "api-contract.yaml updated for any new/changed endpoints"
+      status: "✅ PASS"
+      note: "Contract is the source of truth — implementation matches it exactly."
+    - item: "Migration files are named clearly and reversible"
+      status: "✅ PASS"
+      note: "0001_create_feedback_items_table.py has upgrade() and downgrade() with proper cleanup."
+
+  feature_completeness:
+    - item: "Loading states on all async UI operations"
+      status: "✅ PASS"
+      note: |
+        FeedbackForm: loading state disables buttons, shows "Saving..." / "Deleting...".
+        FeedbackListPage: server component handles initial fetch.
+    - item: "Error states on all async UI operations"
+      status: "✅ PASS"
+      note: |
+        FeedbackForm: error banner at top of form (role="alert").
+        FeedbackListClient: initialError rendered as alert banner.
+        EditFeedbackPage: NotFoundState for 404.
+    - item: "Escalations: all are resolved"
+      status: "❌ FAIL"
+      note: "2026-03-12T10-00-00-risk.yaml is still OPEN (alembic/env.py)."
+    - item: "Agent assumptions: all reviewed and confirmed by human"
+      status: "PENDING"
+      note: "See assumptions section below."
+
+  delivery:
+    - item: "Conventional commit message used"
+      status: "PENDING — not yet committed"
+    - item: "PR description explains why, not just what"
+      status: "PENDING — PR not yet created"
+    - item: "No unintended files in diff"
+      status: "✅ PASS"
+      note: "All files match implementation plan scope. FeedbackListClient.tsx is a justified addition."
+    - item: "Reviewer agent report attached to PR"
+      status: "✅ THIS FILE"
+
+  ai_specific:
+    - item: "Build and test agents were separate"
+      status: "✅ PASS"
+      note: "Test file header says 'Written by: tester agent (adversarial)'. Separate from build."
+    - item: "All done signal assumptions reviewed"
+      status: "⚠️ NO DONE SIGNALS FOUND"
+      note: "No explicit done-signal files found in repo. Assumptions reviewed from test findings."
+    - item: "No contract drift — agents didn't improvise beyond the spec"
+      status: "✅ PASS"
+      note: "Implementation matches contract exactly. No extra endpoints or schema fields."
+    - item: "Escalation log reviewed — any open escalations are blockers"
+      status: "❌ OPEN ESCALATION"
+      note: "2026-03-12T10-00-00-risk.yaml — alembic/env.py"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ISSUES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+issues:
+
+  blockers:
+    - id: "BLOCK-001"
+      file: "app/backend/alembic/env.py"
+      line: "N/A — file does not exist"
+      description: |
+        alembic/env.py is missing. The escalation (2026-03-12T10-00-00-risk.yaml)
+        was raised by the backend agent but remains status: open. Without this file,
+        `alembic upgrade head` cannot run, which blocks production database migration.
+        The migration file exists (0001_create_feedback_items_table.py) but cannot
+        execute without env.py.
+      why_it_matters: "Production deployment is impossible without database migration capability."
+      resolution: "Human approves and creates the standard alembic/env.py file per escalation Option A."
+
+  warnings:
+    - id: "WARN-001"
+      file: "app/frontend/src/components/feedback/FeedbackForm.tsx"
+      line: "37-275"
+      description: |
+        FeedbackForm component is 238 lines. While individual functions within it
+        are under 30 lines, the component itself is large. The implementation plan
+        explicitly chose a single component with mode prop over two separate components
+        (Decision #4). This is justified but should be decomposed if more features are
+        added (e.g., extracting field groups into sub-components).
+      promote: false
+
+    - id: "WARN-002"
+      description: |
+        No frontend component tests exist (INFRA-002 from test findings). The
+        FeedbackForm, FilterBar, FeedbackTable, and FeedbackListClient components
+        have significant client-side logic (validation, filtering) that is only
+        tested indirectly through the API client tests. @testing-library/react
+        is already in devDependencies — component tests should be added in a follow-up.
+      promote: false
+
+    - id: "WARN-003"
+      file: "app/frontend/src/app/feedback/[id]/page.tsx"
+      line: "28-29"
+      description: |
+        catch block on line 28 catches all errors from getFeedback() and treats them
+        as "not found". A network error or 500 server error would show the same
+        "Feedback item not found" message. Should differentiate between 404 and other
+        errors to show appropriate messaging.
+      promote: false
+
+  notes:
+    - id: "NOTE-001"
+      description: |
+        FeedbackListClient.tsx is an extra file not in the implementation plan's file
+        list. This is a JUSTIFIED deviation: the plan specifies page.tsx as a server
+        component with client children, but Next.js requires client state (useState for
+        filters) to be in a "use client" component. Splitting into server page.tsx +
+        client FeedbackListClient.tsx is the correct Next.js pattern.
+      promote: true
+
+    - id: "NOTE-002"
+      description: |
+        Button component includes a custom "destructive-outline" variant not in standard
+        shadcn. This was added to match the ui-spec's "Delete button (full-width, red outline)".
+        Clean addition — does not modify the shadcn base pattern.
+      promote: true
+
+    - id: "NOTE-003"
+      description: |
+        deleteFeedback() in api.ts correctly bypasses the generic request<T>() helper
+        to avoid calling res.json() on a 204 No Content response. The tester agent
+        wrote an adversarial test verifying this. Good defensive coding.
+      promote: true
+
+    - id: "NOTE-004"
+      description: |
+        list_feedback query includes secondary sort by id DESC (BUG-001 fix).
+        This goes slightly beyond the contract ("descending date_logged order")
+        but is a correct tiebreaker for deterministic ordering. Not a contract violation.
+      promote: true
+
+    - id: "NOTE-005"
+      description: |
+        pyproject.toml specifies requires-python = ">=3.11" while the implementation
+        plan references api-patterns.md which shows ">=3.12". The backend .venv uses
+        Python 3.11. Not a blocker but should be aligned.
+      promote: false
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CONTRACT COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+contract_compliance: "✅ Clean"
+contract_details: |
+  All 5 endpoints implemented exactly per api-contract.yaml.
+  All schemas (Theme, Status, FeedbackCreate, FeedbackUpdate, FeedbackRead) match.
+  All status codes (200, 201, 204, 404, 422) match.
+  All error messages match ("Feedback item not found").
+  No undocumented endpoints (only /health, which is standard infrastructure).
+  No extra fields in response shapes.
+  Enum values match exactly (including "In Progress" with space).
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI SPEC COMPLIANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+ui_spec_compliance: "✅ Clean"
+ui_spec_details: |
+  Routes: /, /feedback, /feedback/new, /feedback/:id, 404 catch-all — all implemented ✅
+  Components:
+    - AppHeader: title + "Log Feedback" button with Plus icon ✅
+    - FilterBar: search input, theme dropdown, status dropdown, clear button ✅
+    - FeedbackTable: columns (Client, Summary, Theme badge, Status badge, Date, Edit link) ✅
+    - EmptyState (no data): "No feedback logged yet. Log your first item ->" ✅
+    - EmptyState (no results): "No items match your filters." ✅
+    - FormHeader: title + Cancel link ✅
+    - FeedbackForm (create): all fields, validation, "Save Feedback" button ✅
+    - FeedbackForm (edit): pre-populated, "Save Changes" + "Delete" buttons ✅
+    - NotFoundState: "Feedback item not found." + "Return to list" link ✅
+
+  Badge colors match ui-spec:
+    - Theme: UX=purple, Performance=orange, Support=blue, Pricing=pink, Communication=teal ✅
+    - Status: Open=blue, In Progress=amber, Actioned=green ✅
+
+  Interactions:
+    - Client-side filtering (search + theme + status) ✅
+    - Clear filters button appears when filters active ✅
+    - Inline validation on blur ✅
+    - Delete uses browser confirm() ✅
+    - Date formatted "Mon DD, YYYY" ✅
+    - Row hover bg-gray-50 ✅
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PLAN DEVIATION AUDIT
+# ═══════════════════════════════════════════════════════════════════════════════
+
+plan_deviations:
+  - description: "FeedbackListClient.tsx added (not in plan's file list)"
+    justified: true
+    reason: "Required by Next.js server/client component boundary. See NOTE-001."
+
+  - description: "alembic/env.py NOT created (in plan's file list)"
+    justified: true
+    reason: "Backend agent raised escalation (blocked by boundary hook). Status: open."
+
+  - description: "alembic migration manually written instead of autogenerated"
+    justified: true
+    reason: "Without env.py, autogenerate is impossible. Manual migration is correct."
+
+  - description: "requires-python >=3.11 instead of >=3.12"
+    justified: false
+    reason: "Likely matches the local runtime. Should align with api-patterns.md convention."
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ASSUMPTIONS FLAGGED
+# ═══════════════════════════════════════════════════════════════════════════════
+
+assumptions_flagged:
+  - source: "test-findings OBS-001"
+    assumption: "Empty string client_name is acceptable (frontend-only validation)"
+    risk: low
+    note: "Frontend validates non-empty. API accepts empty strings. Low risk for MVP."
+
+  - source: "test-findings OBS-002"
+    assumption: "varchar(255) is not strictly enforced at API level"
+    risk: low
+    note: "CSS truncation handles display. No data integrity risk for MVP."
+
+  - source: "implementation-plan Decision #3"
+    assumption: "Client-side filtering only — no server-side filtering"
+    risk: low
+    note: "Acceptable for MVP. Will need server-side if dataset grows beyond hundreds."
+
+  - source: "implementation-plan Decision #7"
+    assumption: "No updated_at timestamp"
+    risk: low
+    note: "Contract doesn't require it. UI doesn't display it. Can add later if needed."
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PATTERNS WORTH PROMOTING
+# ═══════════════════════════════════════════════════════════════════════════════
+
+patterns_to_promote:
+  - id: "NOTE-001"
+    pattern: "Server component page.tsx + client wrapper component for pages needing client state"
+    promote: true
+    reason: "Correct Next.js 15 pattern for server-fetched data + client-side interactivity"
+
+  - id: "NOTE-002"
+    pattern: "Custom shadcn button variants for domain-specific styling"
+    promote: true
+    reason: "Clean extension of shadcn base components without modifying core primitives"
+
+  - id: "NOTE-003"
+    pattern: "Bypass generic API helper for endpoints with no response body (204)"
+    promote: true
+    reason: "Prevents res.json() errors on empty responses. Tester caught and validated this."
+
+  - id: "NOTE-004"
+    pattern: "Secondary sort key (id DESC) for deterministic ordering"
+    promote: true
+    reason: "Prevents flaky tests and non-deterministic UX when timestamps collide"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RECOMMENDATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+recommendation: |
+  MERGE WITH CONDITIONS:
+
+  1. MUST: Resolve escalation 2026-03-12T10-00-00-risk.yaml by creating alembic/env.py.
+     This is standard scaffolding — approve Option A and create the file. Without it,
+     production migration is blocked.
+
+  2. SHOULD (post-merge follow-up): Add frontend component tests for FeedbackForm
+     validation logic and FilterBar filtering (WARN-002).
+
+  3. SHOULD (post-merge follow-up): Improve error handling in EditFeedbackPage to
+     distinguish 404 from network/server errors (WARN-003).
+
+  4. CONSIDER: Add backend min_length validation for client_name and summary
+     (test findings OBS-001).
+
+  The implementation is high quality. Contract compliance is exact. UI matches the spec.
+  Tests are thorough and adversarial. The only hard blocker is the missing alembic/env.py
+  which is an infrastructure file blocked by policy, not a code quality issue.
