@@ -17,7 +17,26 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
+DIM='\033[2m'
 NC='\033[0m'
+
+# Run claude with streaming output so you can see what it's doing
+run_claude() {
+  local prompt="$1"
+  claude --dangerously-skip-permissions --output-format stream-json -p "$prompt" 2>&1 | while IFS= read -r line; do
+    local msg_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+    case "$msg_type" in
+      assistant)
+        echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text' 2>/dev/null | while IFS= read -r text; do
+          [ -n "$text" ] && echo -e "${DIM}  ${text}${NC}"
+        done
+        echo "$line" | jq -r '.message.content[]? | select(.type == "tool_use") | "  🔧 \(.name)"' 2>/dev/null | while IFS= read -r tool; do
+          [ -n "$tool" ] && echo -e "${DIM}${tool}${NC}"
+        done
+        ;;
+    esac
+  done
+}
 
 step()  { echo -e "\n${CYAN}═══════════════════════════════════════${NC}"; echo -e "${CYAN}  $1${NC}"; echo -e "${CYAN}═══════════════════════════════════════${NC}\n"; }
 gate()  { echo -e "\n${YELLOW}┌─────────────────────────────────────┐${NC}"; echo -e "${YELLOW}│  GATE: $1${NC}"; echo -e "${YELLOW}└─────────────────────────────────────┘${NC}"; }
@@ -37,9 +56,7 @@ run_promote() {
 
   echo "Processing review report: $REVIEW_REPORT"
 
-  claude \
-    --dangerously-skip-permissions \
-    -p "
+  run_claude "
 You are updating the harness knowledge base after a successful feature delivery.
 
 Read the reviewer report at: ${REVIEW_REPORT}
@@ -119,9 +136,7 @@ run_sync() {
     return 1
   fi
 
-  claude \
-    --dangerously-skip-permissions \
-    -p "
+  run_claude "
 You are syncing the built application back to Figma as part of the compound loop.
 
 Figma file key: ${FIGMA_KEY}
@@ -167,9 +182,7 @@ run_gc() {
   TS=$(date +%Y%m%d-%H%M%S)
   REPORT="escalation/log/gc-report-${TS}.yaml"
 
-  claude \
-    --dangerously-skip-permissions \
-    -p "
+  run_claude "
 You are the harness maintenance agent. Scan the repository and produce
 a health report at ${REPORT}.
 

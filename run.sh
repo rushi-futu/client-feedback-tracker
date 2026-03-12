@@ -3,8 +3,10 @@
 # Gates pause for human input. Everything else runs automatically.
 #
 # Usage:
-#   ./run.sh "feature intent" https://www.figma.com/make/...   # with Figma prototype
-#   ./run.sh "feature intent"                                   # intent-only (no prototype)
+#   ./run.sh "feature intent" https://www.figma.com/make/...             # with Figma prototype
+#   ./run.sh "feature intent"                                             # intent-only (no prototype)
+#   ./run.sh "feature intent" https://www.figma.com/make/... --verbose   # full Claude output
+#   VERBOSE=1 ./run.sh "feature intent"                                   # same via env var
 
 set -uo pipefail
 
@@ -13,12 +15,19 @@ PROTOTYPE_URL="${2:-}"
 BRANCH="ai/feature-$(date +%Y%m%d-%H%M%S)"
 TS=$(date +%Y%m%d-%H%M%S)
 
+# Verbosity: set VERBOSE=1 to see full Claude output, or pass --verbose as last arg
+VERBOSE="${VERBOSE:-0}"
+for arg in "$@"; do
+  [[ "$arg" == "--verbose" ]] && VERBOSE=1
+done
+
 # Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
 BOLD='\033[1m'
+DIM='\033[2m'
 NC='\033[0m'
 
 step()  { echo -e "\n${CYAN}═══════════════════════════════════════${NC}"; echo -e "${CYAN}  $1${NC}"; echo -e "${CYAN}═══════════════════════════════════════${NC}\n"; }
@@ -26,6 +35,60 @@ gate()  { echo -e "\n${YELLOW}┌───────────────�
 ok()    { echo -e "${GREEN}✓ $1${NC}"; }
 fail()  { echo -e "${RED}✗ $1${NC}"; exit 1; }
 phase() { echo -e "\n${BOLD}${CYAN}▶ PHASE $1${NC}\n"; }
+
+# Run claude with streaming output so you can see what it's doing.
+# Usage: run_claude [--system-prompt "..."] "prompt"
+run_claude() {
+  local sys_prompt=""
+  local prompt=""
+
+  # Parse args
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --system-prompt)
+        sys_prompt="$2"
+        shift 2
+        ;;
+      *)
+        prompt="$1"
+        shift
+        ;;
+    esac
+  done
+
+  local cmd=(claude --dangerously-skip-permissions --output-format stream-json)
+  if [ -n "$sys_prompt" ]; then
+    cmd+=(--system-prompt "$sys_prompt")
+  fi
+  cmd+=(-p "$prompt")
+
+  # Stream JSON output, extract and display assistant text + tool calls in real time
+  "${cmd[@]}" 2>&1 | while IFS= read -r line; do
+    # Extract assistant text messages
+    local msg_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
+
+    case "$msg_type" in
+      assistant)
+        # Show assistant text output
+        echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text' 2>/dev/null | while IFS= read -r text; do
+          [ -n "$text" ] && echo -e "${DIM}  ${text}${NC}"
+        done
+        # Show tool use summaries
+        echo "$line" | jq -r '.message.content[]? | select(.type == "tool_use") | "  🔧 \(.name)"' 2>/dev/null | while IFS= read -r tool; do
+          [ -n "$tool" ] && echo -e "${DIM}${tool}${NC}"
+        done
+        ;;
+      result)
+        # Show final result text (last message)
+        echo "$line" | jq -r '.result // empty' 2>/dev/null | while IFS= read -r text; do
+          if [ -n "$text" ] && [ "$VERBOSE" = "1" ]; then
+            echo -e "${DIM}  ${text}${NC}"
+          fi
+        done
+        ;;
+    esac
+  done
+}
 
 echo -e "${BOLD}"
 echo "═══════════════════════════════════════════════════════════"
@@ -84,10 +147,7 @@ DO NOT copy this code. Read it as a design reference only."
   fi
 
   AGENT=$(cat .claude/agents/visual.md)
-  claude \
-    --system-prompt "$AGENT" \
-    --dangerously-skip-permissions \
-    -p "
+  run_claude --system-prompt "$AGENT" "
 Read the PM prototype and produce design/ui-spec.md.
 
 ${SOURCE_PROMPT}
@@ -144,10 +204,7 @@ ok "Branch $BRANCH created"
 
 phase "3/9: PLAN — API Contract"
 ARCHITECT=$(cat .claude/agents/architect.md)
-claude \
-  --system-prompt "$ARCHITECT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$ARCHITECT" "
 ## Phase 1: API Contract
 
 Read in this order before doing anything:
@@ -193,10 +250,7 @@ ok "Contract approved"
 # ═══════════════════════════════════════════════════════════════
 
 phase "4/9: PLAN — Implementation Plan"
-claude \
-  --system-prompt "$ARCHITECT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$ARCHITECT" "
 ## Phase 2: Implementation Plan
 
 The contract has been approved by humans.
@@ -243,10 +297,7 @@ ok "Plan approved"
 
 phase "5/9: BUILD — Backend"
 BE_AGENT=$(cat .claude/agents/backend.md)
-claude \
-  --system-prompt "$BE_AGENT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$BE_AGENT" "
 Read in this order before writing any code:
 1. tasks/implementation-plan.md — primary source of truth
 2. api-contract.yaml — confirm APPROVED
@@ -271,10 +322,7 @@ ok "Backend committed"
 
 phase "6/9: BUILD — Frontend"
 FE_AGENT=$(cat .claude/agents/frontend.md)
-claude \
-  --system-prompt "$FE_AGENT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$FE_AGENT" "
 Read in this order before writing any code:
 1. tasks/implementation-plan.md — primary source of truth
 2. design/ui-spec.md — layout and interaction reference (do not copy code)
@@ -305,10 +353,7 @@ ok "Frontend committed"
 
 phase "7/9: TEST — Adversarial Suite"
 TEST_AGENT=$(cat .claude/agents/tester.md)
-claude \
-  --system-prompt "$TEST_AGENT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$TEST_AGENT" "
 Read:
 - .claude/skills/testing/test-patterns.md
 - api-contract.yaml
@@ -339,10 +384,7 @@ ok "Findings triaged"
 
 phase "8/9: REVIEW"
 REV_AGENT=$(cat .claude/agents/reviewer.md)
-claude \
-  --system-prompt "$REV_AGENT" \
-  --dangerously-skip-permissions \
-  -p "
+run_claude --system-prompt "$REV_AGENT" "
 Read:
 - .claude/skills/delivery/definition-of-done.md
 - .claude/skills/codebase/api-patterns.md
@@ -430,9 +472,7 @@ if [[ "$CHOICE" == "1" ]]; then
   REVIEW_REPORT=$(ls -t escalation/log/review-*.yaml escalation/log/review-*.md 2>/dev/null | head -1 || echo "")
 
   if [ -n "$REVIEW_REPORT" ]; then
-    claude \
-      --dangerously-skip-permissions \
-      -p "
+    run_claude "
 You are updating the harness knowledge base after a successful feature delivery.
 
 Read the reviewer report at: ${REVIEW_REPORT}
@@ -474,9 +514,7 @@ If there are no promote: true items, output: NO_PATTERNS_TO_PROMOTE and stop.
 
   if [ "$SYNC_ENABLED" = "true" ] && [ -n "$FIGMA_KEY" ]; then
     step "Compound: Sync to Figma"
-    claude \
-      --dangerously-skip-permissions \
-      -p "
+    run_claude "
 You are syncing the built application back to Figma as part of the compound loop.
 
 Figma file key: ${FIGMA_KEY}
