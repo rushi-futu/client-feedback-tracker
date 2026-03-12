@@ -9,7 +9,7 @@ router = APIRouter(prefix="/feedback", tags=["feedback"])
 
 @router.get("/", response_model=list[FeedbackRead])
 def list_feedback(db: Session = Depends(get_db)):
-    return db.query(Feedback).order_by(Feedback.date_logged.desc()).all()
+    return db.query(Feedback).order_by(Feedback.date_logged.desc(), Feedback.id.desc()).all()
 
 
 @router.get("/{feedback_id}", response_model=FeedbackRead)
