@@ -4,11 +4,11 @@ UI Spec: design/ui-spec.md
 Contract: api-contract.yaml
 
 ## Backend Tasks
-- [ ] BE-01: Model — Create `Feedback` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged. Table name: `feedback_items`.
-- [ ] BE-02: Migration — Autogenerate Alembic migration for `feedback_items` table
-- [ ] BE-03: Schemas — Create Pydantic schemas: `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead`, plus `Theme` and `Status` enums
-- [ ] BE-04: Router — Create `/feedback` router with 5 endpoints: list (GET /), get (GET /{id}), create (POST /), update (PATCH /{id}), delete (DELETE /{id})
-- [ ] BE-05: App wiring — Register feedback router in main.py, update CORS, import model in alembic env.py
+- [x] BE-01: Model — Create `Feedback` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged. Table name: `feedback_items`.
+- [x] BE-02: Migration — Alembic migration for `feedback_items` table (manual — autogenerate blocked by env.py protection, see escalation)
+- [x] BE-03: Schemas — Create Pydantic schemas: `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead`, plus `Theme` and `Status` enums
+- [x] BE-04: Router — Create `/feedback` router with 5 endpoints: list (GET /), get (GET /{id}), create (POST /), update (PATCH /{id}), delete (DELETE /{id})
+- [x] BE-05: App wiring — Register feedback router in main.py, update CORS (alembic env.py blocked — escalation raised)
 
 ## Frontend Tasks
 - [ ] FE-01: Types — Create TypeScript types matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status` enums
