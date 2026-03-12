@@ -1,0 +1,174 @@
+# ==============================================================================
+# API Contract — Client Feedback Tracker
+# ==============================================================================
+
+# Feature: Client Feedback CRUD with Filtering
+# Added: 2026-03-12
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md (APPROVED)
+
+# ------------------------------------------------------------------------------
+# Endpoints
+# ------------------------------------------------------------------------------
+
+endpoints:
+
+  # --- LIST / SEARCH / FILTER ---
+  - method: GET
+    path: /feedback/
+    purpose: >
+      Feeds FeedbackTable component on /feedback page.
+      Returns all feedback items, optionally filtered by search text,
+      theme, and/or status. Supports the FilterBar interactions.
+    query_params:
+      search:
+        type: string
+        required: false
+        description: "Case-insensitive substring match on client_name"
+      theme:
+        type: Theme
+        required: false
+        description: "Exact match filter on theme enum"
+      status:
+        type: Status
+        required: false
+        description: "Exact match filter on status enum"
+    response:
+      200:
+        body: list[FeedbackRead]
+        description: "Always returns an array — empty array when no matches"
+
+  # --- GET SINGLE ITEM ---
+  - method: GET
+    path: /feedback/{id}
+    purpose: >
+      Feeds FeedbackForm (edit mode) on /feedback/:id page.
+      Pre-populates form fields with existing data.
+    path_params:
+      id:
+        type: integer
+        required: true
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+        description: "Triggers NotFoundState component on edit page"
+
+  # --- CREATE ---
+  - method: POST
+    path: /feedback/
+    purpose: >
+      Handles FeedbackForm (create mode) submission on /feedback/new page.
+      Creates a new feedback item with auto-generated id and date_logged.
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }
+        description: "Pydantic validation failure — missing required fields"
+
+  # --- UPDATE ---
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: >
+      Handles FeedbackForm (edit mode) submission on /feedback/:id page.
+      Partial update — only provided fields are changed.
+    path_params:
+      id:
+        type: integer
+        required: true
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: { detail: string }
+
+  # --- DELETE ---
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: >
+      Handles "Delete" button on FeedbackForm (edit mode).
+      Triggered after browser confirm() dialog is accepted by user.
+    path_params:
+      id:
+        type: integer
+        required: true
+    response:
+      204:
+        body: null
+        description: "No content — item deleted successfully"
+      404:
+        body: { detail: "Feedback item not found" }
+
+# ------------------------------------------------------------------------------
+# Schemas
+# ------------------------------------------------------------------------------
+
+schemas:
+
+  # --- Enums ---
+
+  Theme:
+    type: string
+    enum: ["UX", "Performance", "Support", "Pricing", "Communication"]
+    description: "Feedback category. Displayed as coloured badge in FeedbackTable."
+
+  Status:
+    type: string
+    enum: ["Open", "In Progress", "Actioned"]
+    description: "Feedback lifecycle status. Displayed as coloured badge in FeedbackTable."
+
+  # --- Request schemas ---
+
+  FeedbackCreate:
+    fields:
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+    required: [client_name, summary, theme]
+    defaults:
+      status: "Open"
+      detail: null
+    description: >
+      Used by POST /feedback/. Maps to FeedbackForm (create mode).
+      status defaults to "Open" if not provided (per ui-spec: form defaults to Open).
+
+  FeedbackUpdate:
+    fields:
+      client_name: string | null
+      summary: string | null
+      detail: string | null
+      theme: Theme | null
+      status: Status | null
+    required: []
+    description: >
+      Used by PATCH /feedback/{id}. All fields optional — partial update.
+      Maps to FeedbackForm (edit mode) submission.
+
+  # --- Response schema ---
+
+  FeedbackRead:
+    fields:
+      id: integer
+      client_name: string
+      summary: string
+      detail: string | null
+      theme: Theme
+      status: Status
+      date_logged: date
+      created_at: datetime
+      updated_at: datetime
+    required: [id, client_name, summary, theme, status, date_logged, created_at, updated_at]
+    description: >
+      Returned by all read/write endpoints. Maps to both FeedbackTable rows
+      and FeedbackForm pre-population. date_logged is auto-set to creation date
+      and formatted by the frontend as "Mon DD, YYYY".
