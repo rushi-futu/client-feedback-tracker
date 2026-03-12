@@ -4,13 +4,13 @@ UI Spec: design/ui-spec.md
 Contract: api-contract.yaml
 
 ## Backend Tasks
-- [ ] BE-01: Model — Create `FeedbackItem` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged, created_at, updated_at
-- [ ] BE-02: Migration — Auto-generate Alembic migration for `feedback_items` table
-- [ ] BE-03: Schemas — Create `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` Pydantic schemas with `Theme` and `Status` enums
-- [ ] BE-04: Router — Create `/feedback` router with 5 endpoints: list (with search/theme/status query params), get by id, create, update (PATCH), delete
-- [ ] BE-05: Main — Register feedback router in `main.py`, update CORS and app metadata
-- [ ] BE-06: Database — Set up SQLAlchemy engine, session, Base, and `get_db` dependency
-- [ ] BE-07: Config — Set up pydantic-settings with DATABASE_URL
+- [x] BE-01: Model — Create `FeedbackItem` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged, created_at, updated_at
+- [ ] BE-02: Migration — Auto-generate Alembic migration for `feedback_items` table (BLOCKED: alembic/env.py requires human creation — see escalation)
+- [x] BE-03: Schemas — Create `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` Pydantic schemas with `Theme` and `Status` enums
+- [x] BE-04: Router — Create `/feedback` router with 5 endpoints: list (with search/theme/status query params), get by id, create, update (PATCH), delete
+- [x] BE-05: Main — Register feedback router in `main.py`, update CORS and app metadata
+- [x] BE-06: Database — Set up SQLAlchemy engine, session, Base, and `get_db` dependency
+- [x] BE-07: Config — Set up pydantic-settings with DATABASE_URL
 
 ## Frontend Tasks
 - [ ] FE-01: Types — Create TypeScript interfaces matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status`
