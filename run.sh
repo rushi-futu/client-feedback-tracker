@@ -371,12 +371,81 @@ git diff --staged --quiet || git commit -m "test: adversarial suite"
 git push origin "$BRANCH"
 ok "Tests committed"
 
-# ── Gate 4: Triage test findings ──
-gate "Triage test findings"
-echo "Review escalation/log/ for test findings"
-read -p "Approve? (y/n): " APPROVE
-[[ "$APPROVE" == "y" ]] || fail "Test findings block merge."
-ok "Findings triaged"
+# ── Gate 4: Triage test findings → fix loop ──
+FIX_ROUND=0
+while true; do
+  gate "Triage test findings"
+  echo ""
+  echo "  Review escalation/log/ for test findings."
+  echo ""
+  echo "  Options:"
+  echo "    a) Approve — all findings are acceptable, continue to review"
+  echo "    f) Fix — describe what to fix, build agents will address it"
+  echo "    q) Quit — abort the pipeline"
+  echo ""
+  read -p "Choice (a/f/q): " TEST_CHOICE
+
+  case "$TEST_CHOICE" in
+    a)
+      ok "Findings triaged — continuing"
+      break
+      ;;
+    f)
+      FIX_ROUND=$((FIX_ROUND + 1))
+      echo ""
+      read -p "What should be fixed? (describe the issues): " FIX_INSTRUCTIONS
+      echo ""
+
+      step "Fix round $FIX_ROUND: applying fixes"
+      run_claude "
+You are fixing issues found during testing. This is fix round ${FIX_ROUND}.
+
+The human has reviewed the test findings and wants these fixed:
+${FIX_INSTRUCTIONS}
+
+Read the test findings in escalation/log/test-findings-${TS}.yaml for full context.
+Read the implementation plan and contract for reference:
+- tasks/implementation-plan.md
+- api-contract.yaml
+- .claude/skills/codebase/api-patterns.md
+- .claude/skills/codebase/frontend-patterns.md
+
+Fix ONLY what was requested. Do not refactor unrelated code.
+After fixing, re-run the failing tests to verify.
+Report what you changed and whether the tests pass now.
+"
+
+      git add app/backend/ app/frontend/ tasks/ escalation/ 2>/dev/null || true
+      git diff --staged --quiet || git commit -m "fix: test findings — round ${FIX_ROUND}"
+      git push origin "$BRANCH"
+      ok "Fixes applied (round $FIX_ROUND)"
+
+      # Re-test after fix
+      step "Re-testing after fix round $FIX_ROUND"
+      run_claude --system-prompt "$TEST_AGENT" "
+Re-run tests after fix round ${FIX_ROUND}.
+
+Read the previous findings: escalation/log/test-findings-${TS}.yaml
+Run all existing tests. Also check whether the fixes introduced new issues.
+Update the findings file with current status.
+
+Do not fix anything. Report only.
+"
+
+      git add app/backend/tests/ app/frontend/src/ escalation/log/ 2>/dev/null || true
+      git diff --staged --quiet || git commit -m "test: re-test after fix round ${FIX_ROUND}"
+      git push origin "$BRANCH"
+      ok "Re-test complete"
+      # Loop back to triage
+      ;;
+    q)
+      fail "Pipeline aborted by user."
+      ;;
+    *)
+      echo "Invalid choice. Use a (approve), f (fix), or q (quit)."
+      ;;
+  esac
+done
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 8: REVIEW — DoD + Contract + Plan Compliance
@@ -412,11 +481,81 @@ git diff --staged --quiet || git commit -m "review: DoD + plan + ui compliance r
 git push origin "$BRANCH"
 ok "Review committed"
 
-# ── Gate 5: Approve merge ──
-gate "Approve for merge"
-echo "Review escalation/log/ for the review report"
-read -p "Open PR? (y/n): " APPROVE
-[[ "$APPROVE" == "y" ]] || fail "Merge rejected."
+# ── Gate 5: Review findings → fix loop ──
+REVIEW_FIX_ROUND=0
+while true; do
+  gate "Review — approve for merge"
+  echo ""
+  echo "  Review escalation/log/ for the review report."
+  echo ""
+  echo "  Options:"
+  echo "    m) Merge — open PR, all good"
+  echo "    f) Fix — describe what to fix, then re-review"
+  echo "    q) Quit — abort the pipeline"
+  echo ""
+  read -p "Choice (m/f/q): " REVIEW_CHOICE
+
+  case "$REVIEW_CHOICE" in
+    m)
+      ok "Approved for merge"
+      break
+      ;;
+    f)
+      REVIEW_FIX_ROUND=$((REVIEW_FIX_ROUND + 1))
+      echo ""
+      read -p "What should be fixed? (describe the issues): " REVIEW_FIX_INSTRUCTIONS
+      echo ""
+
+      step "Review fix round $REVIEW_FIX_ROUND: applying fixes"
+      run_claude "
+You are fixing issues found during review. This is review fix round ${REVIEW_FIX_ROUND}.
+
+The human has reviewed the report and wants these fixed:
+${REVIEW_FIX_INSTRUCTIONS}
+
+Read the review report in escalation/log/review-${TS}.yaml for full context.
+Read the implementation plan and contract for reference:
+- tasks/implementation-plan.md
+- api-contract.yaml
+- .claude/skills/codebase/api-patterns.md
+- .claude/skills/codebase/frontend-patterns.md
+
+Fix ONLY what was requested. Do not refactor unrelated code.
+Report what you changed.
+"
+
+      git add app/backend/ app/frontend/ tasks/ escalation/ 2>/dev/null || true
+      git diff --staged --quiet || git commit -m "fix: review findings — round ${REVIEW_FIX_ROUND}"
+      git push origin "$BRANCH"
+      ok "Review fixes applied (round $REVIEW_FIX_ROUND)"
+
+      # Re-review after fix
+      step "Re-reviewing after fix round $REVIEW_FIX_ROUND"
+      run_claude --system-prompt "$REV_AGENT" "
+Re-review after fix round ${REVIEW_FIX_ROUND}.
+
+Read the previous report: escalation/log/review-${TS}.yaml
+Check whether the issues flagged have been addressed.
+Check whether the fixes introduced new issues.
+Update the review report with current status.
+
+Focus on the items that were flagged — you don't need to redo the full review.
+"
+
+      git add escalation/log/ 2>/dev/null || true
+      git diff --staged --quiet || git commit -m "review: re-review after fix round ${REVIEW_FIX_ROUND}"
+      git push origin "$BRANCH"
+      ok "Re-review complete"
+      # Loop back to gate
+      ;;
+    q)
+      fail "Pipeline aborted by user."
+      ;;
+    *)
+      echo "Invalid choice. Use m (merge), f (fix), or q (quit)."
+      ;;
+  esac
+done
 
 # ── Open PR ──
 step "Opening PR"
