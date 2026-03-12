@@ -4,12 +4,12 @@ UI Spec: design/ui-spec.md (APPROVED)
 Contract: api-contract.yaml
 
 ## Backend Tasks
-- [ ] BE-01: Model — Create `Feedback` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged, updated_at
-- [ ] BE-02: Migration — Auto-generate Alembic migration for `feedback` table
-- [ ] BE-03: Schemas — Create `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` Pydantic schemas + `Theme` and `Status` enums
-- [ ] BE-04: Router — Create `/feedback` router with five endpoints: list (GET /), get (GET /{id}), create (POST /), update (PATCH /{id}), delete (DELETE /{id})
-- [ ] BE-05: List filtering — Implement query-param filtering on GET /feedback/ (search by client_name substring, exact match on theme, exact match on status)
-- [ ] BE-06: App wiring — Register feedback router in main.py, import model in alembic env.py
+- [x] BE-01: Model — Create `Feedback` SQLAlchemy model with fields: id, client_name, summary, detail, theme (enum), status (enum), date_logged, updated_at
+- [x] BE-02: Migration — Auto-generate Alembic migration for `feedback` table
+- [x] BE-03: Schemas — Create `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` Pydantic schemas + `Theme` and `Status` enums
+- [x] BE-04: Router — Create `/feedback` router with five endpoints: list (GET /), get (GET /{id}), create (POST /), update (PATCH /{id}), delete (DELETE /{id})
+- [x] BE-05: List filtering — Implement query-param filtering on GET /feedback/ (search by client_name substring, exact match on theme, exact match on status)
+- [x] BE-06: App wiring — Register feedback router in main.py, import model in alembic env.py
 
 ## Frontend Tasks
 - [ ] FE-01: Types — Create TypeScript interfaces matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme` enum, `Status` enum
