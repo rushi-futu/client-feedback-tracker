@@ -1,14 +1,14 @@
 # Client Feedback CRUD
-Status: PENDING_CONTRACT_APPROVAL
+Status: PENDING_PLAN_APPROVAL
 UI Spec: design/ui-spec.md (APPROVED)
 Contract: api-contract.yaml#Client Feedback CRUD
 
 ## Backend Tasks
-- [ ] BE-01: Model — Create `Feedback` SQLAlchemy model in `app/backend/app/models/feedback.py` with columns: id (int PK), client_name (varchar 255), summary (varchar 500), detail (text nullable), theme (SAEnum), status (SAEnum default "Open"), date_logged (timestamptz server_default now), updated_at (timestamptz)
-- [ ] BE-02: Schema — Create Pydantic schemas `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` in `app/backend/app/schemas/feedback.py` with `Theme` and `Status` enums
-- [ ] BE-03: Router — Create FastAPI router in `app/backend/app/routers/feedback.py` with 5 endpoints: GET /, GET /{id}, POST /, PATCH /{id}, DELETE /{id}. GET / must return items ordered by date_logged descending.
-- [ ] BE-04: App wiring — Register feedback router in `app/backend/app/main.py`. Update `alembic/env.py` to import feedback model.
-- [ ] BE-05: Migration — Run `alembic revision --autogenerate` to create feedback table migration
+- [x] BE-01: Model — Create `Feedback` SQLAlchemy model in `app/backend/app/models/feedback.py` with columns: id (int PK), client_name (varchar 255), summary (varchar 500), detail (text nullable), theme (SAEnum), status (SAEnum default "Open"), date_logged (timestamptz server_default now), updated_at (timestamptz)
+- [x] BE-02: Schema — Create Pydantic schemas `FeedbackCreate`, `FeedbackUpdate`, `FeedbackRead` in `app/backend/app/schemas/feedback.py` with `Theme` and `Status` enums
+- [x] BE-03: Router — Create FastAPI router in `app/backend/app/routers/feedback.py` with 5 endpoints: GET /, GET /{id}, POST /, PATCH /{id}, DELETE /{id}. GET / must return items ordered by date_logged descending.
+- [x] BE-04: App wiring — Register feedback router in `app/backend/app/main.py`. Update `alembic/env.py` to import feedback model.
+- [x] BE-05: Migration — Run `alembic revision --autogenerate` to create feedback table migration
 
 ## Frontend Tasks
 - [ ] FE-01: Types — Add TypeScript interfaces `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate` and enums `Theme`, `Status` to `app/frontend/src/types/index.ts`
