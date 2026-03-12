@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+.env
+.env.*
+coverage/
+*.test.tsx
+*.test.ts
+__tests__/

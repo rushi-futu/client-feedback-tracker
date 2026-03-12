@@ -47,7 +47,7 @@ done
 # ── CONTRACT STATUS CHECK ─────────────────────────────────────────
 # Block writes to implementation files if no APPROVED contract exists for the feature.
 # Check api-contract.yaml for APPROVED status before allowing new endpoint/model files.
-if [[ "$FILE_PATH" =~ src/(api|routes|controllers|services|models)/ ]]; then
+if [[ "$FILE_PATH" =~ (src|app/backend/app|app/frontend/src)/(api|routes|controllers|services|models|routers|schemas)/ ]]; then
   if [[ -f "api-contract.yaml" ]]; then
     APPROVED=$(grep -c "Status: APPROVED" api-contract.yaml 2>/dev/null || echo "0")
     PENDING=$(grep -c "Status: PENDING_APPROVAL" api-contract.yaml 2>/dev/null || echo "0")

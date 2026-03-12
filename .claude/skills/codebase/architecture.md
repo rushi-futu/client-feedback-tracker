@@ -4,62 +4,66 @@
 ## Directory Structure
 
 ```
-story-assignment/
-├── backend/
-│   ├── app/
-│   │   ├── main.py              # FastAPI app entry point
-│   │   ├── config.py            # Settings via pydantic-settings
-│   │   ├── database.py          # SQLAlchemy engine + session
-│   │   ├── models/              # SQLAlchemy ORM models
-│   │   │   ├── __init__.py
-│   │   │   ├── brief.py
-│   │   │   ├── reporter.py
-│   │   │   └── assignment.py
-│   │   ├── schemas/             # Pydantic request/response schemas
-│   │   │   ├── __init__.py
-│   │   │   ├── brief.py
-│   │   │   ├── reporter.py
-│   │   │   └── assignment.py
-│   │   ├── routers/             # FastAPI routers — one per domain
-│   │   │   ├── __init__.py
-│   │   │   ├── briefs.py
-│   │   │   ├── reporters.py
-│   │   │   └── assignments.py
-│   │   ├── services/            # Business logic — no DB access here
-│   │   │   ├── assignment_scorer.py
-│   │   │   └── coverage_gap.py
-│   │   └── dependencies.py      # FastAPI Depends() providers
-│   ├── tests/
-│   │   ├── conftest.py
-│   │   ├── test_briefs.py
-│   │   ├── test_reporters.py
-│   │   └── test_assignments.py
-│   ├── alembic/
-│   ├── alembic.ini
-│   ├── pyproject.toml
-│   └── .env.example
+client-feedback-tracker/
+├── app/
+│   ├── backend/
+│   │   ├── app/
+│   │   │   ├── main.py              # FastAPI app entry point
+│   │   │   ├── config.py            # Settings via pydantic-settings
+│   │   │   ├── database.py          # SQLAlchemy engine + session
+│   │   │   ├── models/              # SQLAlchemy ORM models
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── brief.py
+│   │   │   │   ├── reporter.py
+│   │   │   │   └── assignment.py
+│   │   │   ├── schemas/             # Pydantic request/response schemas
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── brief.py
+│   │   │   │   ├── reporter.py
+│   │   │   │   └── assignment.py
+│   │   │   ├── routers/             # FastAPI routers — one per domain
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── briefs.py
+│   │   │   │   ├── reporters.py
+│   │   │   │   └── assignments.py
+│   │   │   ├── services/            # Business logic — no DB access here
+│   │   │   │   ├── assignment_scorer.py
+│   │   │   │   └── coverage_gap.py
+│   │   │   └── dependencies.py      # FastAPI Depends() providers
+│   │   ├── tests/
+│   │   │   ├── conftest.py
+│   │   │   ├── test_briefs.py
+│   │   │   ├── test_reporters.py
+│   │   │   └── test_assignments.py
+│   │   ├── alembic/
+│   │   ├── alembic.ini
+│   │   ├── pyproject.toml
+│   │   ├── Dockerfile
+│   │   └── .env.example
+│   │
+│   └── frontend/
+│       ├── src/
+│       │   ├── app/                 # Next.js 15 app router
+│       │   │   ├── layout.tsx
+│       │   │   ├── page.tsx
+│       │   │   ├── briefs/
+│       │   │   │   └── new/page.tsx
+│       │   │   └── assignments/
+│       │   │       └── [id]/page.tsx
+│       │   ├── components/
+│       │   │   ├── ui/              # shadcn primitives — do not modify
+│       │   │   ├── board/
+│       │   │   └── forms/
+│       │   ├── lib/
+│       │   │   ├── api.ts           # all API calls live here
+│       │   │   └── utils.ts
+│       │   └── types/
+│       │       └── index.ts         # TypeScript types matching backend schemas
+│       ├── package.json
+│       ├── tsconfig.json
+│       └── Dockerfile
 │
-├── frontend/
-│   ├── src/
-│   │   ├── app/                 # Next.js 15 app router
-│   │   │   ├── layout.tsx
-│   │   │   ├── page.tsx
-│   │   │   ├── briefs/
-│   │   │   │   └── new/page.tsx
-│   │   │   └── assignments/
-│   │   │       └── [id]/page.tsx
-│   │   ├── components/
-│   │   │   ├── ui/              # shadcn primitives — do not modify
-│   │   │   ├── board/
-│   │   │   └── forms/
-│   │   ├── lib/
-│   │   │   ├── api.ts           # all API calls live here
-│   │   │   └── utils.ts
-│   │   └── types/
-│   │       └── index.ts         # TypeScript types matching backend schemas
-│   ├── package.json
-│   └── tsconfig.json
-│
+├── docker-compose.yml
 ├── .claude/
 ├── config/
 ├── api-contract.yaml
@@ -68,7 +72,7 @@ story-assignment/
 
 ## Architectural Decisions
 
-1. **Separate backend/ and frontend/ at root** — different runtimes, different deploy targets. Never import across the boundary — only communicate via HTTP.
+1. **app/backend/ and app/frontend/ under app/** — different runtimes, different deploy targets, each with its own Dockerfile. Never import across the boundary — only communicate via HTTP.
 
 2. **FastAPI routers map 1:1 to domain entities** — one router per resource. No god routers.
 
@@ -103,16 +107,31 @@ Next.js component
 
 | Module | Responsibility |
 |--------|---------------|
-| backend/app/models/ | Database shape only |
-| backend/app/schemas/ | API contract shapes |
-| backend/app/routers/ | HTTP routing and validation |
-| backend/app/services/ | Business logic and scoring |
-| frontend/src/app/ | Pages and layouts |
-| frontend/src/components/ | UI components |
-| frontend/src/lib/api.ts | All API calls |
+| app/backend/app/models/ | Database shape only |
+| app/backend/app/schemas/ | API contract shapes |
+| app/backend/app/routers/ | HTTP routing and validation |
+| app/backend/app/services/ | Business logic and scoring |
+| app/frontend/src/app/ | Pages and layouts |
+| app/frontend/src/components/ | UI components |
+| app/frontend/src/lib/api.ts | All API calls |
+
+## Docker
+
+The project is dockerized. Each service has its own Dockerfile:
+
+- `app/backend/Dockerfile` — Python 3.12, installs from pyproject.toml, runs alembic + uvicorn
+- `app/frontend/Dockerfile` — Node 20, installs from package.json, builds and serves Next.js
+- `docker-compose.yml` at root — orchestrates backend, frontend, and PostgreSQL
+
+Local development: `docker compose up` starts all services.
+- Backend: http://localhost:8000
+- Frontend: http://localhost:3000
+- PostgreSQL: localhost:5432 (user: postgres, password: postgres, db: feedback_tracker)
+
+The `DATABASE_URL` in docker-compose points to the `db` service. Local `.env` files can override for non-Docker development.
 
 ## What's Off-Limits
 
-- `backend/alembic/` — never hand-write migrations, use `alembic revision --autogenerate`
-- `frontend/src/components/ui/` — shadcn primitives, do not modify
+- `app/backend/alembic/` — never hand-write migrations, use `alembic revision --autogenerate`
+- `app/frontend/src/components/ui/` — shadcn primitives, do not modify
 - `.env` files — never commit, never hardcode

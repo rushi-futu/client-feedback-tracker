@@ -384,7 +384,7 @@ jobs:
 
           Build the complete backend implementation.
           Implement exactly what the plan describes — no more, no less.
-          All code in backend/.
+          All code in app/backend/.
           Output your Done Signal when complete.
           "
 
@@ -392,7 +392,7 @@ jobs:
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
-          git add backend/ tasks/ escalation/
+          git add app/backend/ tasks/ escalation/
           git diff --staged --quiet || \
             git commit -m "build(backend): implement per approved plan [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"
@@ -424,15 +424,19 @@ jobs:
           Read in this order before writing any code:
           1. tasks/implementation-plan.md — primary source of truth
           2. design/ui-spec.md — layout and interaction reference (do not copy code)
-          3. api-contract.yaml — confirm APPROVED
-          4. .claude/skills/codebase/frontend-patterns.md
-          5. .claude/skills/codebase/architecture.md
-          6. tasks/current-feature.md — mark frontend tasks done as you go
+          3. Read the backend code already built:
+             - app/backend/app/schemas/ — actual Pydantic schemas
+             - app/backend/app/routers/ — actual endpoints and query params
+          4. api-contract.yaml — confirm APPROVED
+          5. .claude/skills/codebase/frontend-patterns.md
+          6. .claude/skills/codebase/architecture.md
+          7. tasks/current-feature.md — mark frontend tasks done as you go
 
           Build the complete frontend implementation from scratch.
+          The backend is already built — read it.
           Use the ui-spec for what to build and how it should look.
           Use the patterns for how to build it.
-          All code in frontend/.
+          All code in app/frontend/.
           Output your Done Signal when complete.
           "
 
@@ -440,7 +444,7 @@ jobs:
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
-          git add frontend/ tasks/ escalation/
+          git add app/frontend/ tasks/ escalation/
           git diff --staged --quiet || \
             git commit -m "build(frontend): implement per approved plan [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"
@@ -482,7 +486,7 @@ jobs:
           - api-contract.yaml
           - tasks/implementation-plan.md (use decisions + service logic for adversarial coverage)
 
-          Write adversarial tests for everything in backend/ and frontend/.
+          Write adversarial tests for everything in app/backend/ and app/frontend/.
           Run all tests.
           Document findings in escalation/log/test-findings-${TS}.yaml
 
@@ -493,7 +497,7 @@ jobs:
         run: |
           git config user.name "claude-code[bot]"
           git config user.email "claude-code[bot]@users.noreply.github.com"
-          git add backend/tests/ frontend/src/ escalation/log/
+          git add app/backend/tests/ app/frontend/src/ escalation/log/
           git diff --staged --quiet || \
             git commit -m "test: adversarial suite [skip ci]"
           git push origin "${{ needs.bootstrap.outputs.branch }}"

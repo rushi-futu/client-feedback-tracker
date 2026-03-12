@@ -6,7 +6,7 @@
 Every router follows this pattern exactly:
 
 ```python
-# backend/app/routers/briefs.py
+# app/backend/app/routers/briefs.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -59,7 +59,7 @@ def delete_brief(brief_id: int, db: Session = Depends(get_db)):
 Three schema classes per resource — Create, Update, Read:
 
 ```python
-# backend/app/schemas/brief.py
+# app/backend/app/schemas/brief.py
 from pydantic import BaseModel
 from datetime import datetime
 from enum import Enum
@@ -102,7 +102,7 @@ class BriefRead(BaseModel):
 ## Model Pattern
 
 ```python
-# backend/app/models/brief.py
+# app/backend/app/models/brief.py
 from sqlalchemy import Column, Integer, String, Text, DateTime, Enum as SAEnum
 from sqlalchemy.sql import func
 from app.database import Base
@@ -123,7 +123,7 @@ class Brief(Base):
 ## Database Setup
 
 ```python
-# backend/app/database.py
+# app/backend/app/database.py
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from app.config import settings
@@ -145,7 +145,7 @@ def get_db():
 ## App Entry Point
 
 ```python
-# backend/app/main.py
+# app/backend/app/main.py
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import briefs, reporters, assignments
@@ -171,11 +171,11 @@ def health():
 ## Config Pattern
 
 ```python
-# backend/app/config.py
+# app/backend/app/config.py
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql://postgres:postgres@localhost:5432/storyboard"
+    database_url: str = "postgresql://postgres:postgres@localhost:5432/feedback_tracker"
     environment: str = "development"
 
     model_config = {"env_file": ".env"}

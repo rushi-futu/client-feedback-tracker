@@ -46,7 +46,7 @@ jobs:
 
           1. CONTRACT DRIFT
              Read api-contract.yaml.
-             Scan backend/ and frontend/ for routes and components.
+             Scan app/backend/ and app/frontend/ for routes and components.
              Flag any endpoint in the contract with no implementation, or
              any implemented endpoint not in the contract.
 

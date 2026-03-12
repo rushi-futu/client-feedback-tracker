@@ -90,8 +90,8 @@ steps:
       Frontend: follow frontend-patterns.md, read backend code, use ui-spec as layout reference.
       Both: read implementation-plan.md as primary source of truth.
     outputs:
-      - backend/**
-      - frontend/**
+      - app/backend/**
+      - app/frontend/**
     gate:
       type: none
 
@@ -103,8 +103,8 @@ steps:
       Write and run adversarial tests. Read implementation-plan.md for intent and edge cases.
       Document findings. Do not fix — only find and document.
     outputs:
-      - backend/tests/**
-      - frontend/src/**/__tests__/**
+      - app/backend/tests/**
+      - app/frontend/src/**/__tests__/**
       - escalation/log/test-findings-*.yaml
     gate:
       type: human_triage

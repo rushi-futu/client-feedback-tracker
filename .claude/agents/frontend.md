@@ -31,8 +31,8 @@ exactly what the API provides.
    - Data shapes: confirms what fields are actually visible
    - **Do not copy any code from here — this is a spec, not an implementation**
 3. **Backend code for this slice** — read the actual backend implementation:
-   - `backend/app/schemas/` — see the real Pydantic schemas (match your TS types to these)
-   - `backend/app/routers/` — see the real endpoints, query params, response shapes
+   - `app/backend/app/schemas/` — see the real Pydantic schemas (match your TS types to these)
+   - `app/backend/app/routers/` — see the real endpoints, query params, response shapes
    - This is your advantage over working in parallel — use it
 4. `api-contract.yaml` — confirm status is APPROVED
 5. `.claude/skills/codebase/frontend-patterns.md` — patterns to follow
@@ -86,8 +86,8 @@ add components, add routes). Read the existing code before extending it.
 ## Slice Coordination
 
 The backend agent has already built this slice's backend. This means:
-- You can read `backend/app/schemas/` to see exact response shapes
-- You can read `backend/app/routers/` to see exact query params and error codes
+- You can read `app/backend/app/schemas/` to see exact response shapes
+- You can read `app/backend/app/routers/` to see exact query params and error codes
 - If the backend deviated from the plan, match the actual implementation
 - If the deviation looks wrong, raise an escalation
 

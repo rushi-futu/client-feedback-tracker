@@ -23,8 +23,8 @@ steps:
       Write a regression test that would have caught this.
       Keep the change minimal and scoped.
     outputs:
-      - backend/**
-      - frontend/**
+      - app/backend/**
+      - app/frontend/**
       - tests/**
     gate:
       type: none

@@ -15,7 +15,7 @@ components/
 ## Page Pattern (Server Component default)
 
 ```tsx
-// src/app/page.tsx
+// app/frontend/src/app/page.tsx
 import { getBriefs } from "@/lib/api"
 import { BriefBoard } from "@/components/board/BriefBoard"
 
@@ -30,7 +30,7 @@ export default async function BoardPage() {
 Mark with "use client" only for: onClick, useState, useEffect, form submission.
 
 ```tsx
-// src/components/board/BriefCard.tsx
+// app/frontend/src/components/board/BriefCard.tsx
 "use client"
 
 import { Brief } from "@/types"
@@ -79,7 +79,7 @@ export function BriefCard({ brief, onApprove, onReassign }: BriefCardProps) {
 All API calls go through lib/api.ts. Never call fetch() directly in a component.
 
 ```typescript
-// src/lib/api.ts
+// app/frontend/src/lib/api.ts
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -118,7 +118,7 @@ export const approveAssignment = (assignmentId: number) =>
 Types mirror backend Pydantic schemas exactly. Keep in sync with api-contract.yaml.
 
 ```typescript
-// src/types/index.ts
+// app/frontend/src/types/index.ts
 
 export type Priority = "low" | "medium" | "high" | "breaking"
 export type BriefStatus = "unassigned" | "assigned" | "in_progress" | "published"
@@ -162,7 +162,7 @@ export interface CreateBriefInput {
 ## Form Pattern
 
 ```tsx
-// src/components/forms/CreateBriefForm.tsx
+// app/frontend/src/components/forms/CreateBriefForm.tsx
 "use client"
 
 import { useState } from "react"

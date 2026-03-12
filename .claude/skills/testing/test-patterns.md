@@ -21,7 +21,7 @@ No e2e (Playwright/Cypress) until the feature is stable. Tester agent writes int
 ### conftest.py — the only place DB setup lives
 
 ```python
-# backend/tests/conftest.py
+# app/backend/tests/conftest.py
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -85,7 +85,7 @@ def brief_factory(db):
 ### Integration test pattern — every endpoint
 
 ```python
-# backend/tests/test_briefs.py
+# app/backend/tests/test_briefs.py
 
 class TestCreateBrief:
     def test_creates_brief_with_valid_data(self, client):
@@ -160,7 +160,7 @@ class TestUpdateBrief:
 ### Service unit test pattern — pure logic, no HTTP
 
 ```python
-# backend/tests/test_assignment_scorer.py
+# app/backend/tests/test_assignment_scorer.py
 from app.services.assignment_scorer import score_assignment
 
 class TestAssignmentScorer:
@@ -202,7 +202,7 @@ class TestAssignmentScorer:
 ### Contract test pattern — response shape matches api-contract.yaml
 
 ```python
-# backend/tests/test_contracts.py
+# app/backend/tests/test_contracts.py
 # Validates that every endpoint's response matches the shape in api-contract.yaml.
 # If this fails, the contract and implementation have drifted.
 
@@ -254,7 +254,7 @@ Tester agent runs this mentally for every endpoint before writing tests:
 ### vitest setup
 
 ```typescript
-// frontend/vitest.config.ts
+// app/frontend/vitest.config.ts
 import { defineConfig } from "vitest/config"
 import react from "@vitejs/plugin-react"
 import path from "path"
@@ -272,14 +272,14 @@ export default defineConfig({
 ```
 
 ```typescript
-// frontend/src/tests/setup.ts
+// app/frontend/src/tests/setup.ts
 import "@testing-library/jest-dom"
 ```
 
 ### Component test pattern
 
 ```typescript
-// frontend/src/components/board/__tests__/BriefCard.test.tsx
+// app/frontend/src/components/board/__tests__/BriefCard.test.tsx
 import { render, screen, fireEvent } from "@testing-library/react"
 import { BriefCard } from "../BriefCard"
 import { Brief } from "@/types"
@@ -337,7 +337,7 @@ describe("BriefCard", () => {
 ### API client test pattern — mock fetch, test error handling
 
 ```typescript
-// frontend/src/lib/__tests__/api.test.ts
+// app/frontend/src/lib/__tests__/api.test.ts
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { createBrief, getBrief } from "../api"
 
@@ -383,7 +383,7 @@ describe("createBrief", () => {
 ### Form test pattern
 
 ```typescript
-// frontend/src/components/forms/__tests__/CreateBriefForm.test.tsx
+// app/frontend/src/components/forms/__tests__/CreateBriefForm.test.tsx
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 import { CreateBriefForm } from "../CreateBriefForm"
 import * as api from "@/lib/api"
@@ -426,12 +426,12 @@ describe("CreateBriefForm", () => {
 ## Naming conventions
 
 ```
-# Backend
+# Backend (app/backend/)
 tests/test_{resource}.py          — integration tests per resource
 tests/test_{service_name}.py      — unit tests per service
 tests/test_contracts.py           — contract shape tests
 
-# Frontend
+# Frontend (app/frontend/)
 src/components/**/__tests__/*.test.tsx   — component tests
 src/lib/__tests__/*.test.ts              — utility/api tests
 ```

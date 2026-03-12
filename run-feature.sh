@@ -139,11 +139,11 @@ Read in this order before writing any code:
 
 Build the complete backend implementation.
 Implement exactly what the plan describes — no more, no less.
-All code in backend/.
+All code in app/backend/.
 Output your Done Signal when complete.
 "
 
-git add backend/ tasks/ escalation/ 2>/dev/null || true
+git add app/backend/ tasks/ escalation/ 2>/dev/null || true
 git diff --staged --quiet || git commit -m "build(backend): implement per approved plan"
 git push origin "$BRANCH"
 ok "Backend committed"
@@ -159,8 +159,8 @@ Read in this order before writing any code:
 1. tasks/implementation-plan.md — primary source of truth
 2. design/ui-spec.md — layout and interaction reference (do not copy code)
 3. Read the backend code already built:
-   - backend/app/schemas/ — actual Pydantic schemas
-   - backend/app/routers/ — actual endpoints and query params
+   - app/backend/app/schemas/ — actual Pydantic schemas
+   - app/backend/app/routers/ — actual endpoints and query params
 4. api-contract.yaml — confirm APPROVED
 5. .claude/skills/codebase/frontend-patterns.md
 6. .claude/skills/codebase/architecture.md
@@ -170,11 +170,11 @@ Build the complete frontend implementation from scratch.
 The backend is already built — read it.
 Use the ui-spec for what to build and how it should look.
 Use the patterns for how to build it.
-All code in frontend/.
+All code in app/frontend/.
 Output your Done Signal when complete.
 "
 
-git add frontend/ tasks/ escalation/ 2>/dev/null || true
+git add app/frontend/ tasks/ escalation/ 2>/dev/null || true
 git diff --staged --quiet || git commit -m "build(frontend): implement per approved plan"
 git push origin "$BRANCH"
 ok "Frontend committed"
@@ -192,14 +192,14 @@ Read:
 - api-contract.yaml
 - tasks/implementation-plan.md (use decisions + service logic for adversarial coverage)
 
-Write adversarial tests for everything in backend/ and frontend/.
+Write adversarial tests for everything in app/backend/ and app/frontend/.
 Run all tests.
 Document findings in escalation/log/test-findings-${TS}.yaml
 
 Do not fix anything. Find and document only.
 "
 
-git add backend/tests/ frontend/src/ escalation/log/ 2>/dev/null || true
+git add app/backend/tests/ app/frontend/src/ escalation/log/ 2>/dev/null || true
 git diff --staged --quiet || git commit -m "test: adversarial suite"
 git push origin "$BRANCH"
 ok "Tests committed"

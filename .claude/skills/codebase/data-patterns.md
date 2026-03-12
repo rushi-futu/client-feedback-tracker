@@ -10,7 +10,7 @@
 - Relationships defined on the "many" side with back_populates
 
 ```python
-# backend/app/models/assignment.py
+# app/backend/app/models/assignment.py
 from sqlalchemy import Column, Integer, Float, String, ForeignKey, Enum as SAEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -44,7 +44,7 @@ Never write migrations by hand. Always:
 
 ```bash
 # After changing a model:
-cd backend
+cd app/backend
 alembic revision --autogenerate -m "add confidence_score to assignments"
 alembic upgrade head
 
@@ -75,7 +75,7 @@ target_metadata = Base.metadata
 ## Seed Data Pattern
 
 ```python
-# backend/app/seeds.py
+# app/backend/app/seeds.py
 from app.database import SessionLocal
 from app.models.reporter import Reporter
 
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 ## Test Database Pattern
 
 ```python
-# backend/tests/conftest.py
+# app/backend/tests/conftest.py
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine

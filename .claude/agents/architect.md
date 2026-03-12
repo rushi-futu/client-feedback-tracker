@@ -180,7 +180,7 @@ Created: [date]
 | assignments | created_at | timestamptz | server default | |
 
 ### New migrations
-- `backend/alembic/versions/[hash]_[description].py`
+- `app/backend/alembic/versions/[hash]_[description].py`
 
 ### Existing tables modified
 - [table] — [what changes and why]
@@ -189,10 +189,10 @@ Created: [date]
 
 These exact types must be used by both agents. Both copy verbatim. No interpretation.
 
-### Backend — Pydantic schemas (backend/app/schemas/)
+### Backend — Pydantic schemas (app/backend/app/schemas/)
 [exact class definitions with field names, types, Optional markers]
 
-### Frontend — TypeScript types (frontend/src/types/index.ts)
+### Frontend — TypeScript types (app/frontend/src/types/index.ts)
 [exact interface definitions matching Pydantic schemas field-for-field]
 
 ## Delivery Slices
@@ -208,10 +208,10 @@ code from the current and previous slices.
 **Backend scope**:
 | File | Purpose |
 |------|---------|
-| `backend/app/models/[x].py` | SQLAlchemy model |
-| `backend/app/schemas/[x].py` | Pydantic schemas — use Shared Types above |
-| `backend/app/routers/[x].py` | FastAPI router |
-| `backend/app/services/[x].py` | Business logic |
+| `app/backend/app/models/[x].py` | SQLAlchemy model |
+| `app/backend/app/schemas/[x].py` | Pydantic schemas — use Shared Types above |
+| `app/backend/app/routers/[x].py` | FastAPI router |
+| `app/backend/app/services/[x].py` | Business logic |
 
 **Backend service logic**:
 [For each service function in this slice: name, inputs, outputs, logic as pseudocode.
@@ -220,10 +220,10 @@ No real code. Enough detail that the agent cannot make a wrong decision.]
 **Frontend scope**:
 | File | Purpose | UI Spec reference |
 |------|---------|------------------|
-| `frontend/src/types/index.ts` | TypeScript types | Shared Types above |
-| `frontend/src/lib/api.ts` | Add API functions | [which endpoints] |
-| `frontend/src/components/[x].tsx` | [component name] | ui-spec.md § [section] |
-| `frontend/src/app/[route]/page.tsx` | [page name] | ui-spec.md § [route] |
+| `app/frontend/src/types/index.ts` | TypeScript types | Shared Types above |
+| `app/frontend/src/lib/api.ts` | Add API functions | [which endpoints] |
+| `app/frontend/src/components/[x].tsx` | [component name] | ui-spec.md § [section] |
+| `app/frontend/src/app/[route]/page.tsx` | [page name] | ui-spec.md § [route] |
 
 **Frontend component tree** (this slice only):
 ```

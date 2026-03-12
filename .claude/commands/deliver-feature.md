@@ -64,7 +64,7 @@ Read in order:
 4. .claude/skills/codebase/data-patterns.md
 5. tasks/current-feature.md
 
-Build the complete backend. All code in backend/.
+Build the complete backend. All code in app/backend/.
 If a hook blocks a file, tell the user and ask them to create it or approve the change.
 
 Commit and push with message: `build(backend): implement per approved plan`
@@ -76,13 +76,13 @@ Read and follow `.claude/agents/frontend.md`.
 Read in order:
 1. tasks/implementation-plan.md
 2. design/ui-spec.md
-3. The actual backend code you just wrote (backend/app/schemas/, backend/app/routers/)
+3. The actual backend code you just wrote (app/backend/app/schemas/, app/backend/app/routers/)
 4. api-contract.yaml
 5. .claude/skills/codebase/frontend-patterns.md
 6. .claude/skills/codebase/architecture.md
 7. tasks/current-feature.md
 
-Build the complete frontend. All code in frontend/.
+Build the complete frontend. All code in app/frontend/.
 
 Commit and push with message: `build(frontend): implement per approved plan`
 
