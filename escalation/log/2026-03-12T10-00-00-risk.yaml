@@ -2,7 +2,7 @@ id: "2026-03-12T10-00-00-risk"
 timestamp: "2026-03-12T10:00:00Z"
 type: risk
 raised_by: ["backend_teammate"]
-status: open
+status: resolved
 
 description: |
   The implementation plan requires creating `app/backend/alembic/env.py` as part of
