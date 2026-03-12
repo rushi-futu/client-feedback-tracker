@@ -36,7 +36,7 @@ ok()    { echo -e "${GREEN}✓ $1${NC}"; }
 fail()  { echo -e "${RED}✗ $1${NC}"; exit 1; }
 phase() { echo -e "\n${BOLD}${CYAN}▶ PHASE $1${NC}\n"; }
 
-# Run claude with streaming output so you can see what it's doing.
+# Run claude with visible output so you can see what it's doing.
 # Usage: run_claude [--system-prompt "..."] "prompt"
 run_claude() {
   local sys_prompt=""
@@ -56,38 +56,16 @@ run_claude() {
     esac
   done
 
-  local cmd=(claude --dangerously-skip-permissions --output-format stream-json)
+  local cmd=(claude --dangerously-skip-permissions -p "$prompt")
   if [ -n "$sys_prompt" ]; then
-    cmd+=(--system-prompt "$sys_prompt")
+    cmd=(claude --dangerously-skip-permissions --system-prompt "$sys_prompt" -p "$prompt")
   fi
-  cmd+=(-p "$prompt")
 
-  # Stream JSON output, extract and display assistant text + tool calls in real time
-  "${cmd[@]}" 2>&1 | while IFS= read -r line; do
-    # Extract assistant text messages
-    local msg_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
-
-    case "$msg_type" in
-      assistant)
-        # Show assistant text output
-        echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text' 2>/dev/null | while IFS= read -r text; do
-          [ -n "$text" ] && echo -e "${DIM}  ${text}${NC}"
-        done
-        # Show tool use summaries
-        echo "$line" | jq -r '.message.content[]? | select(.type == "tool_use") | "  🔧 \(.name)"' 2>/dev/null | while IFS= read -r tool; do
-          [ -n "$tool" ] && echo -e "${DIM}${tool}${NC}"
-        done
-        ;;
-      result)
-        # Show final result text (last message)
-        echo "$line" | jq -r '.result // empty' 2>/dev/null | while IFS= read -r text; do
-          if [ -n "$text" ] && [ "$VERBOSE" = "1" ]; then
-            echo -e "${DIM}  ${text}${NC}"
-          fi
-        done
-        ;;
-    esac
-  done
+  # Run claude directly — output streams to stdout so you see the final response.
+  # Files are written by claude's tool calls during execution.
+  echo -e "${DIM}  Running claude...${NC}"
+  "${cmd[@]}"
+  echo ""
 }
 
 echo -e "${BOLD}"

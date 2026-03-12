@@ -34,9 +34,10 @@ PROTECTED_PATTERNS=(
 # matching alembic/env.py, .env.example, and other legitimate files.
 
 for pattern in "${PROTECTED_PATTERNS[@]}"; do
-  # Use bash glob matching
+  # Use bash glob matching, with properly anchored regex fallback
+  REGEX=$(echo "$pattern" | sed 's/\./\\./g' | sed 's/\*\*/.*/' | sed 's/\*/[^\/]*/')
   if [[ "$FILE_PATH" == $pattern ]] || \
-     echo "$FILE_PATH" | grep -qE "$(echo "$pattern" | sed 's/\*\*/.*/' | sed 's/\*/[^\/]*/')"; then
+     echo "$FILE_PATH" | grep -qE "(^|/)${REGEX}$"; then
     echo "BOUNDARY VIOLATION: $FILE_PATH is a protected file." >&2
     echo "Raise an escalation of type 'risk' with blast_radius 'high' instead of modifying this directly." >&2
     echo "The human must approve any changes to: $FILE_PATH" >&2

@@ -20,22 +20,12 @@ RED='\033[0;31m'
 DIM='\033[2m'
 NC='\033[0m'
 
-# Run claude with streaming output so you can see what it's doing
+# Run claude with visible output
 run_claude() {
   local prompt="$1"
-  claude --dangerously-skip-permissions --output-format stream-json -p "$prompt" 2>&1 | while IFS= read -r line; do
-    local msg_type=$(echo "$line" | jq -r '.type // empty' 2>/dev/null)
-    case "$msg_type" in
-      assistant)
-        echo "$line" | jq -r '.message.content[]? | select(.type == "text") | .text' 2>/dev/null | while IFS= read -r text; do
-          [ -n "$text" ] && echo -e "${DIM}  ${text}${NC}"
-        done
-        echo "$line" | jq -r '.message.content[]? | select(.type == "tool_use") | "  🔧 \(.name)"' 2>/dev/null | while IFS= read -r tool; do
-          [ -n "$tool" ] && echo -e "${DIM}${tool}${NC}"
-        done
-        ;;
-    esac
-  done
+  echo -e "${DIM}  Running claude...${NC}"
+  claude --dangerously-skip-permissions -p "$prompt"
+  echo ""
 }
 
 step()  { echo -e "\n${CYAN}═══════════════════════════════════════${NC}"; echo -e "${CYAN}  $1${NC}"; echo -e "${CYAN}═══════════════════════════════════════${NC}\n"; }
