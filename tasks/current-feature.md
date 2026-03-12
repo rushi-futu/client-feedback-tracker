@@ -13,17 +13,17 @@ Contract: api-contract.yaml
 - [x] BE-07: Config — Set up pydantic-settings with DATABASE_URL
 
 ## Frontend Tasks
-- [ ] FE-01: Types — Create TypeScript interfaces matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status`
-- [ ] FE-02: API functions — Add `listFeedback(filters?)`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)` to `lib/api.ts`
-- [ ] FE-03: AppHeader — Top bar with title and "Log Feedback" navigation button
-- [ ] FE-04: FilterBar — Search input + theme dropdown + status dropdown + clear filters button; manages filter state
-- [ ] FE-05: FeedbackTable — Data table displaying feedback items with client, summary, theme badge, status badge, date, edit link; includes empty states
-- [ ] FE-06: FeedbackForm — Reusable form for create and edit modes with validation; includes delete button in edit mode
-- [ ] FE-07: Feedback List page (`/feedback`) — Composes AppHeader, FilterBar, FeedbackTable; fetches data with filters
-- [ ] FE-08: Log Feedback page (`/feedback/new`) — FormHeader + FeedbackForm in create mode
-- [ ] FE-09: Edit Feedback page (`/feedback/[id]`) — FormHeader + FeedbackForm in edit mode + NotFoundState
-- [ ] FE-10: Root redirect — `/` redirects to `/feedback`; 404 catch-all redirects to `/feedback`
-- [ ] FE-11: Layout — Root layout with metadata and global styles
+- [x] FE-01: Types — Create TypeScript interfaces matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status`
+- [x] FE-02: API functions — Add `listFeedback(filters?)`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)` to `lib/api.ts`
+- [x] FE-03: AppHeader — Top bar with title and "Log Feedback" navigation button
+- [x] FE-04: FilterBar — Search input + theme dropdown + status dropdown + clear filters button; manages filter state
+- [x] FE-05: FeedbackTable — Data table displaying feedback items with client, summary, theme badge, status badge, date, edit link; includes empty states
+- [x] FE-06: FeedbackForm — Reusable form for create and edit modes with validation; includes delete button in edit mode
+- [x] FE-07: Feedback List page (`/feedback`) — Composes AppHeader, FilterBar, FeedbackTable; fetches data with filters
+- [x] FE-08: Log Feedback page (`/feedback/new`) — FormHeader + FeedbackForm in create mode
+- [x] FE-09: Edit Feedback page (`/feedback/[id]`) — FormHeader + FeedbackForm in edit mode + NotFoundState
+- [x] FE-10: Root redirect — `/` redirects to `/feedback`; 404 catch-all redirects to `/feedback`
+- [x] FE-11: Layout — Root layout with metadata and global styles
 
 ## Test Tasks (tester agent only — do not build)
 - [ ] T-01: Integration — All 5 CRUD endpoints: happy path + 404s + validation failures
