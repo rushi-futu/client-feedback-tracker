@@ -142,6 +142,32 @@ def client():
 | Index | auto on PK and FK | — |
 | Enum column | String with validation | `status = Column(String(20))` |
 
+---
+
+## Pattern: Secondary Sort Key for Deterministic Ordering
+<!-- Promoted: 2026-03-12 -->
+<!-- Source: escalation/log/review-20260312-111941.md -->
+
+When ordering query results by a timestamp column (e.g. `date_logged DESC`), always add
+a secondary sort by `id DESC` as a tiebreaker. Timestamps can collide (same-second inserts,
+batch imports), causing non-deterministic ordering that leads to flaky tests and
+unpredictable UI:
+
+```python
+@router.get("/", response_model=list[FeedbackRead])
+def list_feedback(db: Session = Depends(get_db)):
+    return (
+        db.query(Feedback)
+        .order_by(Feedback.date_logged.desc(), Feedback.id.desc())
+        .all()
+    )
+```
+
+This applies to any list endpoint with user-visible ordering. The secondary key should
+be a unique, monotonically increasing column (usually `id`).
+
+---
+
 ## What NOT to do
 
 - Never use `db.execute(text("raw SQL"))` — use ORM query API
