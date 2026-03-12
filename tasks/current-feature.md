@@ -11,16 +11,16 @@ Contract: api-contract.yaml#Client Feedback CRUD
 - [x] BE-05: Migration — Run `alembic revision --autogenerate` to create feedback table migration
 
 ## Frontend Tasks
-- [ ] FE-01: Types — Add TypeScript interfaces `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate` and enums `Theme`, `Status` to `app/frontend/src/types/index.ts`
-- [ ] FE-02: API functions — Add `listFeedback()`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)` to `app/frontend/src/lib/api.ts`
-- [ ] FE-03: AppHeader component — Top bar with title and "Log Feedback" nav button. Maps to ui-spec § AppHeader.
-- [ ] FE-04: FilterBar component — Search input (client name), theme dropdown, status dropdown, "Clear filters" button. Client-side filtering logic. Maps to ui-spec § FilterBar.
-- [ ] FE-05: FeedbackTable component — Data table with columns: Client, Summary, Theme (badge), Status (badge), Date Logged (formatted), Edit link. Includes both empty states. Maps to ui-spec § FeedbackTable + EmptyState.
-- [ ] FE-06: FeedbackForm component — Shared form for create/edit modes. Fields: client_name, summary, detail, theme, status. Inline validation on blur. Maps to ui-spec § FeedbackForm.
-- [ ] FE-07: Feedback List page — `/feedback` route. Composes AppHeader + FilterBar + FeedbackTable. Server component that fetches data. Maps to ui-spec § Feedback List.
-- [ ] FE-08: Log Feedback page — `/feedback/new` route. Composes FormHeader + FeedbackForm (create mode). Maps to ui-spec § Log Feedback.
-- [ ] FE-09: Edit Feedback page — `/feedback/[id]` route. Composes FormHeader + FeedbackForm (edit mode) + Delete button + NotFoundState. Maps to ui-spec § Edit Feedback.
-- [ ] FE-10: Root redirect — `/` redirects to `/feedback`. 404 catch-all redirects to `/feedback`.
+- [x] FE-01: Types — Add TypeScript interfaces `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate` and enums `Theme`, `Status` to `app/frontend/src/types/index.ts`
+- [x] FE-02: API functions — Add `listFeedback()`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)` to `app/frontend/src/lib/api.ts`
+- [x] FE-03: AppHeader component — Top bar with title and "Log Feedback" nav button. Maps to ui-spec § AppHeader.
+- [x] FE-04: FilterBar component — Search input (client name), theme dropdown, status dropdown, "Clear filters" button. Client-side filtering logic. Maps to ui-spec § FilterBar.
+- [x] FE-05: FeedbackTable component — Data table with columns: Client, Summary, Theme (badge), Status (badge), Date Logged (formatted), Edit link. Includes both empty states. Maps to ui-spec § FeedbackTable + EmptyState.
+- [x] FE-06: FeedbackForm component — Shared form for create/edit modes. Fields: client_name, summary, detail, theme, status. Inline validation on blur. Maps to ui-spec § FeedbackForm.
+- [x] FE-07: Feedback List page — `/feedback` route. Composes AppHeader + FilterBar + FeedbackTable. Server component that fetches data. Maps to ui-spec § Feedback List.
+- [x] FE-08: Log Feedback page — `/feedback/new` route. Composes FormHeader + FeedbackForm (create mode). Maps to ui-spec § Log Feedback.
+- [x] FE-09: Edit Feedback page — `/feedback/[id]` route. Composes FormHeader + FeedbackForm (edit mode) + Delete button + NotFoundState. Maps to ui-spec § Edit Feedback.
+- [x] FE-10: Root redirect — `/` redirects to `/feedback`. 404 catch-all redirects to `/feedback`.
 
 ## Test Tasks (tester agent only — do not build)
 - [ ] T-01: Integration — All 5 CRUD endpoints: happy paths, 404 on missing ID, 422 on invalid body, 204 on delete
