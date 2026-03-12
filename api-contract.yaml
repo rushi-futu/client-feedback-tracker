@@ -1,0 +1,118 @@
+# API Contract — Client Feedback Tracker
+# Maintained by: architect agent
+# Source of truth for backend schemas and frontend types
+
+# ═══════════════════════════════════════════════════════════════════
+# Feature: Client Feedback CRUD
+# Added: 2026-03-12
+# Status: PENDING_APPROVAL
+# UI source: design/ui-spec.md (APPROVED)
+# ═══════════════════════════════════════════════════════════════════
+
+endpoints:
+
+  # ── LIST ALL FEEDBACK ────────────────────────────────────────────
+  - method: GET
+    path: /feedback/
+    purpose: "Feeds FeedbackTable component on /feedback — returns all feedback items sorted by date_logged descending. Filtering is client-side per ui-spec."
+    response:
+      200:
+        body: list[FeedbackRead]
+
+  # ── GET SINGLE FEEDBACK ──────────────────────────────────────────
+  - method: GET
+    path: /feedback/{id}
+    purpose: "Feeds FeedbackForm (edit mode) on /feedback/:id — returns one feedback item by ID"
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+
+  # ── CREATE FEEDBACK ──────────────────────────────────────────────
+  - method: POST
+    path: /feedback/
+    purpose: "Handles FeedbackForm (create mode) submission on /feedback/new"
+    request:
+      body: FeedbackCreate
+    response:
+      201:
+        body: FeedbackRead
+      422:
+        body: { detail: string }   # Pydantic validation errors (automatic)
+
+  # ── UPDATE FEEDBACK ──────────────────────────────────────────────
+  - method: PATCH
+    path: /feedback/{id}
+    purpose: "Handles FeedbackForm (edit mode) 'Save Changes' submission on /feedback/:id"
+    request:
+      body: FeedbackUpdate
+    response:
+      200:
+        body: FeedbackRead
+      404:
+        body: { detail: "Feedback item not found" }
+      422:
+        body: { detail: string }
+
+  # ── DELETE FEEDBACK ──────────────────────────────────────────────
+  - method: DELETE
+    path: /feedback/{id}
+    purpose: "Handles 'Delete' button on /feedback/:id — triggered after browser confirm()"
+    response:
+      204:
+        body: null
+      404:
+        body: { detail: "Feedback item not found" }
+
+# ═══════════════════════════════════════════════════════════════════
+# SCHEMAS
+# ═══════════════════════════════════════════════════════════════════
+
+schemas:
+
+  # ── ENUMS ────────────────────────────────────────────────────────
+
+  Theme:
+    type: enum
+    values: ["UX", "Performance", "Support", "Pricing", "Communication"]
+    notes: "Fixed set for MVP. Maps to color-coded badges in FeedbackTable."
+
+  Status:
+    type: enum
+    values: ["Open", "In Progress", "Actioned"]
+    notes: "Fixed set for MVP. Maps to color-coded badges in FeedbackTable."
+
+  # ── REQUEST SCHEMAS ──────────────────────────────────────────────
+
+  FeedbackCreate:
+    purpose: "POST /feedback/ request body — fields from FeedbackForm (create mode)"
+    fields:
+      client_name: { type: string, required: true, max_length: 255, notes: "Text input, validated as required on blur" }
+      summary: { type: string, required: true, max_length: 500, notes: "Text input, validated as required on blur" }
+      detail: { type: string, required: false, default: null, notes: "Textarea, placeholder says 'optional'" }
+      theme: { type: Theme, required: true, notes: "Select dropdown, validated as required" }
+      status: { type: Status, required: false, default: "Open", notes: "Select dropdown, defaults to 'Open' on create" }
+
+  FeedbackUpdate:
+    purpose: "PATCH /feedback/{id} request body — all fields optional (partial update)"
+    fields:
+      client_name: { type: string, required: false, max_length: 255 }
+      summary: { type: string, required: false, max_length: 500 }
+      detail: { type: string, required: false }
+      theme: { type: Theme, required: false }
+      status: { type: Status, required: false }
+
+  # ── RESPONSE SCHEMA ──────────────────────────────────────────────
+
+  FeedbackRead:
+    purpose: "Response body for all feedback endpoints — what the UI renders"
+    fields:
+      id: { type: integer, required: true, notes: "Auto-generated PK. Used in URL /feedback/:id" }
+      client_name: { type: string, required: true, notes: "Shown in table 'Client' column" }
+      summary: { type: string, required: true, notes: "Shown in table 'Summary' column" }
+      detail: { type: string, required: false, nullable: true, notes: "Not shown in table. Visible only in edit form." }
+      theme: { type: Theme, required: true, notes: "Color-coded badge in table" }
+      status: { type: Status, required: true, notes: "Color-coded badge in table" }
+      date_logged: { type: datetime, required: true, notes: "Auto-set on creation. Shown in table 'Date Logged' column as 'Mon DD, YYYY'. Not editable." }
+    required: [id, client_name, summary, theme, status, date_logged]
