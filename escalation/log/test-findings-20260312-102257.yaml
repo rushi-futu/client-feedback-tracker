@@ -1,0 +1,159 @@
+# Test Findings — 2026-03-12T10:22:57
+# Written by: tester agent (adversarial)
+# Feature: Client Feedback CRUD
+# Contract: api-contract.yaml
+
+type: test_finding
+created: "2026-03-12T10:22:57"
+feature: client-feedback-crud
+route_to: developer
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════
+
+summary: |
+  72 backend integration tests written, 71 passed, 1 failed.
+  20 frontend API client tests written, 20 passed.
+  1 bug found (WARNING). 2 observations for human decision.
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BUGS
+# ═══════════════════════════════════════════════════════════════════════════
+
+bugs:
+
+  - id: BUG-001
+    severity: WARNING
+    file: app/backend/app/routers/feedback.py
+    line: 10
+    test: test_feedback_integration.py::TestListFeedback::test_returns_items_newest_first
+    description: |
+      GET /feedback/ ordering is non-deterministic when items share the same
+      date_logged timestamp. The contract says "returned in descending
+      date_logged order from list endpoint" (newest first). The implementation
+      uses `ORDER BY date_logged DESC` but has no secondary sort key.
+
+      When two items are created within the same second (common in tests and
+      in production when users submit rapidly), SQLite returns them in
+      insertion order (oldest first), which violates the contract's "newest
+      first" guarantee.
+
+      PostgreSQL behaviour may differ but is equally non-deterministic without
+      a tiebreaker.
+    impact: |
+      Users see inconsistent ordering in the feedback list. Items created
+      quickly may appear in the wrong order. The frontend receives data in
+      an order that doesn't match the contract.
+    fix_suggestion: |
+      Add secondary sort: `ORDER BY date_logged DESC, id DESC`.
+      The id column is auto-increment, so higher IDs are always newer.
+    contract_reference: |
+      api-contract.yaml → GET /feedback/ → response 200:
+      "Returned in descending date_logged order from list endpoint"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# OBSERVATIONS (not bugs — human decides)
+# ═══════════════════════════════════════════════════════════════════════════
+
+observations:
+
+  - id: OBS-001
+    description: |
+      Empty string client_name is accepted (201) by POST /feedback/.
+      The contract says client_name is "required: string" but doesn't
+      specify min_length. Empty string "" is technically a valid string.
+
+      The FeedbackForm on the frontend validates client_name is non-empty
+      (trim check), so users can't submit empty names via the UI. But
+      the API accepts it directly.
+
+      Decide: Is this acceptable (frontend-only validation) or should the
+      backend also enforce min_length=1 on client_name and summary?
+    test: test_feedback_integration.py::TestCreateFeedback::test_empty_string_client_name_accepted
+    severity: low
+
+  - id: OBS-002
+    description: |
+      varchar(255) length limit on client_name and summary is NOT enforced
+      by SQLite (test DB). Strings >255 chars are accepted and stored
+      without error. In production with PostgreSQL, this would also succeed
+      because SQLAlchemy's String(255) maps to VARCHAR(255) which PostgreSQL
+      does NOT enforce as a hard limit by default — it allows longer strings.
+
+      However, this could cause display issues in the frontend table where
+      summaries are truncated with CSS (max-w-xs truncate).
+
+      Decide: Is this acceptable or should Pydantic schemas enforce
+      max_length=255 on client_name and summary?
+    test: |
+      test_feedback_integration.py::TestCreateFeedback::test_very_long_client_name
+      test_feedback_integration.py::TestCreateFeedback::test_very_long_summary
+    severity: low
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MISSING TEST INFRASTRUCTURE
+# ═══════════════════════════════════════════════════════════════════════════
+
+missing_infrastructure:
+
+  - id: INFRA-001
+    description: |
+      Frontend has no vitest.config.ts or test setup prior to this test run.
+      The tester agent created vitest.config.ts and src/tests/setup.ts.
+      The package.json has no "test" script defined.
+
+      Recommendation: Add "test": "vitest run" to package.json scripts.
+    severity: low
+
+  - id: INFRA-002
+    description: |
+      No frontend component tests exist yet. The FeedbackForm, FilterBar,
+      FeedbackTable, and FeedbackListClient components have significant
+      client-side logic (validation, filtering) that should be tested.
+
+      Component tests were not written in this pass because the project
+      lacked @testing-library/react setup and Radix UI components require
+      additional mocking for portal-based selects. This is a gap.
+    severity: medium
+
+# ═══════════════════════════════════════════════════════════════════════════
+# TEST RESULTS
+# ═══════════════════════════════════════════════════════════════════════════
+
+test_results:
+
+  backend:
+    framework: pytest
+    file: app/backend/tests/test_feedback_integration.py
+    total: 72
+    passed: 71
+    failed: 1
+    failing_tests:
+      - TestListFeedback::test_returns_items_newest_first
+    coverage_summary:
+      integration: "5/5 endpoints"
+      contract: "5/5 endpoints"
+      adversarial: "9 edge case tests"
+
+  frontend:
+    framework: vitest
+    file: app/frontend/src/lib/__tests__/api.test.ts
+    total: 20
+    passed: 20
+    failed: 0
+    coverage_summary:
+      api_client: "5/5 functions"
+      error_handling: "6 error path tests"
+      adversarial: "2 edge case tests"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# FILES WRITTEN
+# ═══════════════════════════════════════════════════════════════════════════
+
+files_written:
+  - app/backend/tests/test_feedback_integration.py
+  - app/frontend/vitest.config.ts
+  - app/frontend/src/tests/setup.ts
+  - app/frontend/src/lib/__tests__/api.test.ts
+  - escalation/log/test-findings-20260312-102257.yaml
