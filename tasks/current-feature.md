@@ -11,16 +11,16 @@ Contract: api-contract.yaml
 - [x] BE-05: App wiring — Register feedback router in main.py, update CORS (alembic env.py blocked — escalation raised)
 
 ## Frontend Tasks
-- [ ] FE-01: Types — Create TypeScript types matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status` enums
-- [ ] FE-02: API functions — Add to `lib/api.ts`: `listFeedback()`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)`
-- [ ] FE-03: AppHeader component — Top bar with title and "Log Feedback" nav button (ui-spec § AppHeader)
-- [ ] FE-04: FilterBar component — Search input + theme dropdown + status dropdown + clear filters button, all client-side (ui-spec § FilterBar)
-- [ ] FE-05: FeedbackTable component — Data table with columns: Client, Summary, Theme badge, Status badge, Date Logged, Edit link. Includes both empty states (ui-spec § FeedbackTable, EmptyState)
-- [ ] FE-06: FeedbackForm component — Shared form for create/edit modes with inline validation on blur. Delete button in edit mode with confirm() (ui-spec § FeedbackForm)
-- [ ] FE-07: Feedback List page (`/feedback`) — Composes AppHeader + FilterBar + FeedbackTable, fetches all feedback on load
-- [ ] FE-08: Log Feedback page (`/feedback/new`) — FormHeader + FeedbackForm in create mode
-- [ ] FE-09: Edit Feedback page (`/feedback/[id]`) — FormHeader + FeedbackForm in edit mode, includes NotFoundState
-- [ ] FE-10: Root redirect — `/` redirects to `/feedback`, 404 catch-all redirects to `/feedback`
+- [x] FE-01: Types — Create TypeScript types matching backend schemas: `FeedbackItem`, `FeedbackCreate`, `FeedbackUpdate`, `Theme`, `Status` enums
+- [x] FE-02: API functions — Add to `lib/api.ts`: `listFeedback()`, `getFeedback(id)`, `createFeedback(data)`, `updateFeedback(id, data)`, `deleteFeedback(id)`
+- [x] FE-03: AppHeader component — Top bar with title and "Log Feedback" nav button (ui-spec § AppHeader)
+- [x] FE-04: FilterBar component — Search input + theme dropdown + status dropdown + clear filters button, all client-side (ui-spec § FilterBar)
+- [x] FE-05: FeedbackTable component — Data table with columns: Client, Summary, Theme badge, Status badge, Date Logged, Edit link. Includes both empty states (ui-spec § FeedbackTable, EmptyState)
+- [x] FE-06: FeedbackForm component — Shared form for create/edit modes with inline validation on blur. Delete button in edit mode with confirm() (ui-spec § FeedbackForm)
+- [x] FE-07: Feedback List page (`/feedback`) — Composes AppHeader + FilterBar + FeedbackTable, fetches all feedback on load
+- [x] FE-08: Log Feedback page (`/feedback/new`) — FormHeader + FeedbackForm in create mode
+- [x] FE-09: Edit Feedback page (`/feedback/[id]`) — FormHeader + FeedbackForm in edit mode, includes NotFoundState
+- [x] FE-10: Root redirect — `/` redirects to `/feedback`, 404 catch-all redirects to `/feedback`
 
 ## Test Tasks (tester agent only — do not build)
 - [ ] T-01: Integration — All 5 feedback endpoints: happy path + 404s + 422 validation failures
